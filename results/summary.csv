@@ -1,0 +1,4 @@
+project,perf_commits,measured_changes,estimated_changes,perf_commits_without_numbers,markers_applied,markers_deferred,markers_rejected,marker_snapshot
+"Cellular IoT gateway firmware (ESP32, client work, private)",48,15,19,17,141,1,0,"last tree that carried markers (2026-09-04); current main carries 0 because the project moved decision records into commit messages"
+"Desktop AI model manager (Rust/TypeScript, private)",15,2,0,13,52,6,3,main branch (2026-10-13)
+"twinflow (Python, public)",2,3,0,0,0,0,1,main branch (2026-10-13)
