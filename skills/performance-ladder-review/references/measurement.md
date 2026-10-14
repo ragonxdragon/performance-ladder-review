@@ -32,7 +32,7 @@ Follows the systems that made measured optimization loops work (AlphaEvolve-styl
 
 1. **Fix the workload before starting:** a primary benchmark workload AND a held-out workload (different inputs/sizes, same code paths). The loop optimizes against the primary only; the held-out set is touched once, at the end.
 2. **Baseline:** measure the primary workload with the full protocol; record it. Run the complete test suite and record the pass set.
-3. **Each iteration:** profile -> pick the largest time-consumer (Amdahl) -> apply ONE ladder fix -> run the **full** test suite (any failure: revert immediately) -> re-measure identically -> keep only if significant AND above the noise floor; else revert and log "~". One fix per iteration: batched changes make measurement unattributable.
+3. **Each iteration:** profile -> pick the largest time-consumer by inclusive time (Amdahl) -> apply ONE ladder fix -> run the **full** test suite (any failure: revert immediately) -> re-measure identically -> keep only if significant AND above the noise floor; else revert and log "~". One fix per iteration: batched changes make measurement unattributable.
 4. **Untargeted metrics ride along:** track memory and test-suite duration each iteration even while optimizing time. A "win" that doubles memory or was bought by weakening behavior shows up here.
 5. **The loop never edits tests or benchmarks.** If a test seems wrong, stop and raise it. An optimizer that grades its own homework is the canonical gaming failure.
 6. **Stop when any of:** two consecutive iterations at "~"; the top remaining hotspot is irreducible platform/IO cost; the timebox expires; or a fix regresses (revert, stop). Diminishing returns are the expected end state, not failure.

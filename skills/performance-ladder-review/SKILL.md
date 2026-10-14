@@ -23,7 +23,24 @@ Why this rule exists: measured across multiple benchmarks, LLM-generated "optimi
 - **Execution time is the primary metric.** Wall-clock for batch work; latency percentiles (p50/p95/p99, never averages) for anything a user waits on; memory only when it's the stated problem. Measure before AND after: the delta is the deliverable. Full protocol: references/measurement.md.
 - **Complexity-class fixes are allowed on inspection only when n is unbounded or demonstrably large** (query-in-loop, N+1, nested scans over growing collections). For small bounded collections, keep the simple structure: a linear scan over a contiguous array beats a hash map below ~100 elements because of constant factors and cache locality. Big-O hides both. If n is uncertain, make the change, mark it `estimated`, record the crossover assumption. Before calling n "small," check project docs for the real target (see below).
 - **Improvements below the noise floor are not improvements.** A single run showing 1.1-1.2x is indistinguishable from noise on ordinary hardware. Use a real statistical test (Mann-Whitney via benchstat/hyperfine); see measurement.md.
-- **Predict, then measure, then investigate the divergence.** Estimate the expected cost first (compute- or memory-bound? how many allocations/round-trips/misses from numbers.md); if measured >> predicted, the gap is the bug. Target the largest time fraction, not the first visible flaw. Amdahl's Law caps the gain from optimizing 5% of runtime at 1.05x.
+- **Predict, then measure, then investigate the divergence.** Estimate the expected cost first (compute- or memory-bound? how many allocations/round-trips/misses from numbers.md); if measured >> predicted, the gap is the bug. Target the largest time fraction by inclusive (cumulative) time, not the first visible flaw. Amdahl's Law caps the gain from optimizing 5% of runtime at 1.05x.
+
+## A measured win is a checkpoint, not the finish
+
+The common failure after a first win is stopping early: the self-time profile looks flat, so the work looks done. Self time hides call trees. A constructor, a validation pass, or a conversion that runs on every call spreads its cost over dozens of small functions, and only the inclusive view shows it as one block of avoidable work (rung 1: don't do it, or do it once).
+
+- **Re-profile after every kept change, sorted by inclusive time.** Read the call tree under the measured entry point. "The profile is flat" is a conclusion about inclusive time, never about self time alone.
+- **Keep climbing while one call tree on the measured path still holds a large share** (about 20% or more of the workload's time) and a ladder fix exists for it. Prefer rungs 1 to 3 there: skip repeated setup, construct objects directly instead of re-validating inputs that are already valid, hoist work out of the per-call path, change the algorithm or data structure. A profile that names the path is all the evidence a complexity-class or algorithm change on it needs.
+- **Compare against the minimum the operation must do.** If slicing a 30-element object takes milliseconds, the path does far more than the job requires; that gap is the next target.
+- **Stop only when** the largest remaining call tree is below that share or is irreducible (interpreter, platform, I/O); the last kept fix was below the noise floor; tests fail and the fix can't keep behavior; or the timebox expires. Say which condition ended the work.
+
+## When the task supplies a workload
+
+Benchmark-style tasks hand over the workload the result is judged on (a script, a `workload()` function, a named benchmark). Then:
+
+- **The workload is the profile target and the primary measurement.** Profile it as given. Take before and after numbers from the workload itself, with its own data; a stand-in with different inputs is for quick iteration only.
+- **Its inputs set n.** The small-n guard and the project-docs check above size real-world use; for a supplied workload, the workload's own sizes are the n that counts.
+- **Pursue the largest remaining fraction of its time** through the loop above until a stop condition holds, then run the relevant tests and the original workload once more.
 
 ## Read project docs before trusting "small" or "unused"
 
