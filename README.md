@@ -41,7 +41,7 @@ speed) and the guardrails on what the agent may change without sign-off, are in
 ```text
 PERF: <rung> - <what changed>, <before> -> <after> (<method>)      applied, measured
 PERF: <rung> - <what changed> (estimated; <why it can't be measured>)  applied, estimated
-PERF: deferred - <open question>, <revisit trigger>                deferred to the owner
+PERF: deferred - <open question>, <revisit trigger>                deferred to a maintainer
 PERF: <rung> rejected - <why no change is needed>                  investigated, no change
 ```
 
@@ -96,7 +96,7 @@ Start a new Claude Code session and run `/performance-ladder-review perf-help` t
 
 ## Results in real projects
 
-The skill has run since 2026-07-21 on three of the author's projects: a cellular IoT gateway
+The skill has run since 2026-07-21 on three of my projects: a cellular IoT gateway
 firmware (ESP32, client work, private), a desktop AI model manager (private),
 and [twinflow](https://github.com/ragonxdragon/twinflow) (Python, public). Every number below was
 written at the time of the change, in a commit message or in the `PERF:` comment on the changed
@@ -156,7 +156,7 @@ in [`results/summary.csv`](results/summary.csv).
 
 - **Selection.** Commits since 2026-07-21 whose conventional-commit type is `perf`, or that named
   the skill, plus fix commits merged as part of a review pass, across all branches of the three
-  repositories. This is one author's work after adopting the skill, chosen by commit type. It is
+  repositories. This is my own work after adopting the skill, chosen by commit type. It is
   not a controlled study, and there is no comparison against what the same work would have
   produced without the skill.
 - **Numbers as stated.** Every value comes from a commit message, from the `PERF:` comment on the
@@ -197,11 +197,11 @@ benchmark of performance work in real Python repositories. Each task gives the a
 and a slow workload; the official harness checks that the repository's tests still pass and times
 the workload against the expert patch.
 
-**What was run (2026-10-14):**
+**Setup (both rounds, 2026-10-14):**
 
-- Tasks: `sympy__sympy-12640` and `astropy__astropy-6941`. They are the two smallest images in a
-  40-task sample drawn with a fixed seed from the 411 instances that a reliability audit
-  ([arXiv 2607.01211](https://arxiv.org/abs/2607.01211)) found stable across machines.
+- Tasks come from a 40-task sample drawn with a fixed seed from the 411 instances that a
+  reliability audit ([arXiv 2607.01211](https://arxiv.org/abs/2607.01211)) found stable across
+  machines.
 - Two arms, one run each per task. Same model (`claude-sonnet-5-5`), Claude Code CLI 2.1.238,
   official SWE-fficiency prompt, and instance container in both. The skill arm differs only in
   having `skills/performance-ladder-review/` installed.
@@ -209,31 +209,79 @@ the workload against the expert patch.
   credentials file and, for the skill arm, the skill. It had no CLAUDE.md, hooks, plugins, MCP
   servers, or other skills (the CLI's bundled skills were switched off in both arms).
 - Scoring: the official SWE-fficiency harness, run after the agent runs finished, on the same four
-  pinned CPU threads, on a laptop (i9-11900H, WSL2).
+  pinned CPU threads, on a laptop (i9-11900H, WSL2, 15 GB).
 
-**Per-run results.** "Speedup" is the workload speedup the harness measured for the agent's patch;
-"vs expert" is that speedup divided by the expert patch's speedup (the benchmark's score, where
-above 1 beats the expert). Tokens are the CLI's totals for the run.
+"Speedup" is the workload speedup the harness measured for the agent's patch. "vs expert" is the
+benchmark's score: that speedup divided by the expert patch's speedup, counted as no speedup when
+the official correctness check fails. Above 1 beats the expert. Tokens are the CLI's totals for
+the run (input / cache write / cache read).
 
-| Task | Arm | Tests pass | Speedup | Expert speedup | vs expert | Output tokens | Input / cache write / cache read tokens | Turns | Wall time | Skill fired | Profiled before first edit |
+### Round 1: original skill
+
+Tasks: `sympy__sympy-12640` and `astropy__astropy-6941`, the two smallest images in the sample.
+
+| Task | Arm | Tests pass | Speedup | Expert speedup | vs expert | Output tokens | Other tokens | Turns | Wall time | Skill fired | Profiled before first edit |
 | --- | --- | --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | --- | --- |
 | sympy-12640 | baseline | yes | 5.27x | 1.79x | 2.94 | 2,648 | 18 / 55,037 / 321,591 | 9 | 92 s | no | yes |
 | sympy-12640 | skill | yes | 3.76x | 1.79x | 2.09 | 3,714 | 20 / 40,643 / 443,276 | 12 | 130 s | yes | yes |
 | astropy-6941 | baseline | yes | 9.10x | 26.28x | 0.35 | 7,124 | 26 / 45,031 / 612,271 | 15 | 102 s | no | yes |
 | astropy-6941 | skill | yes | 1.94x | 26.28x | 0.07 | 3,869 | 20 / 42,349 / 455,564 | 11 | 122 s | yes | yes |
 
-All four runs finished on their own, well inside the caps, with no limit errors or retries. In
-these two tasks the baseline arm scored higher than the skill arm on both. Both arms ran a profiler
-before their first edit in every run, and the skill fired as the first tool call in both skill
-runs.
+The baseline scored higher on both tasks. On sympy both arms wrote nearly the same patch, and the
+gap is inside this laptop's timing noise: the unmodified code measured 0.011 s to 0.034 s across
+scoring runs. Astropy shows a real difference in behavior. After the same first fix in both arms,
+the skill arm sorted its profile by self time, wrote "The profile is now flat, with no remaining
+single dominant cost", and stopped "rather than chase small gains". The profile still had 22
+percent of the time in frame construction, the work the baseline and the expert patch removed.
 
-**Caveats.** Two tasks with one run per arm cannot establish a difference, in either direction, and
-no significance claim is made. Agent runs vary from run to run, and two small tasks say little
-about the other 400. Laptop timing is noisier than the benchmark's reference cloud machines. This
-pilot shows the method works end to end, and it can be reproduced or extended with
-[`benchmark/run.py`](benchmark/run.py); the method, fairness controls and deviations from the
-official setup are in [`benchmark/README.md`](benchmark/README.md). Full outputs, including the
-four patches, are in [`benchmark/results/pilot/`](benchmark/results/pilot/).
+**What I changed in the skill.** A measured win is now a checkpoint: re-profile by inclusive
+time, keep going while one call tree on the measured path holds about 20 percent or more of the
+time, prefer skipping repeated work or changing the algorithm there, and stop only on a named
+condition. When a task supplies a benchmark workload, that workload is the profile target and its
+inputs set n. Details and the full diagnosis are in
+[`benchmark/README.md`](benchmark/README.md#diagnosis-and-skill-revision).
+
+### Round 2: revised skill, new tasks
+
+Tasks: `numpy__numpy-19608` and `pydata__xarray-9808`, the two smallest remaining images from
+repositories round 1 did not use. I tuned the revision on the round 1 tasks, so round 2 tests it
+on tasks it was not fitted to.
+
+| Task | Arm | Tests pass (official) | Speedup | Expert speedup | vs expert | Output tokens | Other tokens | Turns | Wall time (CLI time) | Skill fired | Profiled before first edit |
+| --- | --- | --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | --- | --- |
+| numpy-19608 | baseline | no (2 tests, also failing for the expert here) | 1.63x | 1.00x | 0.996 | 7,392 | 24 / 39,216 / 529,624 | 12 | 177 s (176 s) | no | no (timed only) |
+| numpy-19608 | skill | no (1 test, also failing for the expert here) | 1.58x | 1.00x | 0.996 | 18,494 | 38 / 106,787 / 1,065,171 | 22 | 570 s (567 s) | yes | yes |
+| xarray-9808 | baseline | not scorable | n/a | n/a | n/a | 21,143 | 112 / 101,288 / 3,570,944 | 57 | 3,635 s (3,402 s) | no | yes |
+| xarray-9808 | skill | not scorable | n/a | n/a | n/a | 33,038 | 80 / 113,416 / 3,352,086 | 46 | 4,261 s (1,864 s) | yes | yes |
+
+Round 2 shows the revised behavior but gives no usable score comparison:
+
+- **xarray** cannot be scored on this machine. Its workload opens a public cloud Zarr store, and
+  the scorer's run of the unmodified workload ran out of memory every time, including in the
+  expert patch's scoring run. With no expert timing, neither arm has a score.
+- **numpy** fails the official correctness check in both arms. The failing tests also fail under
+  the expert patch on this machine, and the expert's own speedup does not reproduce here (1.00x),
+  so both arms score 0.996. The raw speedups are not comparable either: the laptop slept and ran on
+  battery during scoring, and the unmodified code measured 1.14 s, 7.11 s and 2.12 s across the
+  three scoring runs.
+- **Behavior:** the revised skill kept working after its first win in both tasks: on numpy it made
+  a second round of changes after re-profiling (22 turns against 12), and on xarray it fixed three
+  hotspots against the baseline's two.
+- **The 4,261-second run** did not break the 60-minute cap in running time. The laptop was in
+  standby or asleep for about 2,390 s of it, and the cap counted running time only. The runner now
+  also enforces the cap on wall time, waits for AC power, holds a keep-awake request, and rescores
+  any timing run that spans a pause.
+
+### Caveats
+
+Four tasks with one run per arm cannot establish a difference in either direction, and I make no
+significance claim. Only round 1 produced official scores for both arms, and that round used the
+original skill. Agent runs vary from run to run, and laptop timing is far noisier than the
+benchmark's reference cloud machines. The pilot shows the method works end to end and found a
+concrete flaw in the skill. It can be reproduced or extended with
+[`benchmark/run.py`](benchmark/run.py); the method, fairness controls, the host problems, and the
+deviations from the official setup are in [`benchmark/README.md`](benchmark/README.md). Full
+outputs, including every patch, are in [`benchmark/results/`](benchmark/results/).
 
 ## Repository layout
 
