@@ -51,7 +51,7 @@ THEMES = {
 
 PROJECT_TAG = {
     "twinflow (Python, public)": "twinflow",
-    "Desktop AI model manager (Rust/TypeScript, private)": "desktop app",
+    "Desktop AI model manager (private)": "desktop app",
     "Cellular IoT gateway firmware (ESP32, client work, private)": "firmware",
 }
 
@@ -73,6 +73,7 @@ SHORT = {
     "Wire gzip upload compression to a config flag (opt-in, off by default)": "Gzip upload (opt-in)",
     "Skip the LED refresh when the pixel color is unchanged": "LED refresh skip",
     "Read device twins in parallel worker threads in batch provisioning": "Parallel batch twin reads",
+    "Walk the parsed inventory once instead of indexing into it per tag": "Inventory walk, quadratic to linear",
 }
 
 TIME_MS = {"us": 1e-3, "ms": 1.0, "s": 1e3}
