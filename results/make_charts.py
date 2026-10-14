@@ -71,6 +71,8 @@ SHORT = {
     "Parse inventory responses with a filter for the three fields read": "Inventory parse filter",
     "Serialize the status patch once into a buffer sized up front": "Status patch serialization",
     "Wire gzip upload compression to a config flag (opt-in, off by default)": "Gzip upload (opt-in)",
+    "Skip the LED refresh when the pixel color is unchanged": "LED refresh skip",
+    "Read device twins in parallel worker threads in batch provisioning": "Parallel batch twin reads",
 }
 
 TIME_MS = {"us": 1e-3, "ms": 1.0, "s": 1e3}
@@ -128,6 +130,13 @@ def scaled(row: dict, value: float) -> float:
     if row["unit"] in SIZE_KB:
         return value * SIZE_KB[row["unit"]]
     return value
+
+
+def factor(row: dict) -> float:
+    """Improvement as a multiple: before/after, or after/before where higher is better."""
+    if "throughput" in row["unit"]:
+        return row["a"] / row["b"]
+    return row["b"] / row["a"]
 
 
 def fmt_time(ms: float) -> str:
@@ -234,7 +243,7 @@ def chart_before_after(rows: list[dict], mode: str) -> None:
     )
     axes = axes if len(groups) > 1 else [axes]
     for ax, (name, sub, items) in zip(axes, groups):
-        items = sorted(items, key=lambda r: scaled(r, r["b"]) / scaled(r, r["a"]))
+        items = sorted(items, key=factor)
         lows = [scaled(r, min(r["a"], r["b"])) for r in items]
         highs = [scaled(r, max(r["a"], r["b"])) for r in items]
         for y, r in enumerate(items):
@@ -275,22 +284,23 @@ def chart_before_after(rows: list[dict], mode: str) -> None:
 def chart_factor(rows: list[dict], mode: str) -> None:
     theme = THEMES[mode]
     setup(theme)
-    items = sorted(rows, key=lambda r: r["b"] / r["a"])
+    items = sorted(rows, key=factor)
     fig, ax = plt.subplots(figsize=(10, 0.4 * len(items) + 1.3))
     for y, r in enumerate(items):
-        f = r["b"] / r["a"]
+        f = factor(r)
         ax.plot([1, f], [y, y], color=theme["accent"], linewidth=2, solid_capstyle="round", zorder=2)
         ax.scatter([f], [y], s=64, color=theme["accent"], zorder=3)
         ax.annotate(fmt_factor(f), xy=(f, y), xytext=(8, 0), textcoords="offset points", va="center",
                     ha="left", fontsize=9, color=theme["ink2"])
     ax.set_xscale("log")
-    top = max(r["b"] / r["a"] for r in items)
+    top = max(factor(r) for r in items)
     ax.set_xlim(1, 10 ** (math.ceil(math.log10(top)) + 0.6))
     ax.set_yticks(range(len(items)), [r["label"] for r in items])
     ax.set_ylim(-0.7, len(items) - 0.3)
     style_axis(ax, theme, log=True, suffix="x")
-    ax.set_xlabel("before / after (log scale; 1x = no change)", color=theme["ink2"])
-    ax.set_title("Reduction factor per measured change", loc="left", fontsize=12, fontweight="bold",
+    ax.set_xlabel("before / after, or after / before for throughput (log scale; 1x = no change)",
+                  color=theme["ink2"])
+    ax.set_title("Improvement factor per measured change", loc="left", fontsize=12, fontweight="bold",
                  color=theme["ink"], pad=10)
     fig.tight_layout()
     save(fig, "reduction-factor", mode)
