@@ -99,17 +99,17 @@ Start a new Claude Code session and run `/performance-ladder-review perf-help` t
 The skill has run since 2026-07-21 on three of the author's projects: a cellular IoT gateway
 firmware (ESP32, client work, private), a desktop AI model manager (Rust and TypeScript, private),
 and [twinflow](https://github.com/ragonxdragon/twinflow) (Python, public). Every number below was
-written in a commit message at the time of the change. Nothing was re-run or estimated for this
-page.
+written at the time of the change, in a commit message or in the `PERF:` comment on the changed
+code. Nothing was re-run or estimated for this page.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="results/charts/before-after-dark.svg">
-  <img alt="Dumbbell chart of before and after values for 15 measured changes, grouped into time, size, and counts, each on a log scale" src="results/charts/before-after-light.svg">
+  <img alt="Dumbbell chart of before and after values for 16 measured changes, grouped into time, size, and counts, each on a log scale" src="results/charts/before-after-light.svg">
 </picture>
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="results/charts/reduction-factor-dark.svg">
-  <img alt="Reduction factor per measured change on a log scale, from 1.04x to 530,771x" src="results/charts/reduction-factor-light.svg">
+  <img alt="Improvement factor per measured change on a log scale, from 1.04x to 530,771x" src="results/charts/reduction-factor-light.svg">
 </picture>
 
 The strongest measured results:
@@ -120,20 +120,21 @@ The strongest measured results:
 | twinflow | [Hold the event-log hash until an append changes it (L1)](https://github.com/ragonxdragon/twinflow/commit/03df49a3540ab08307d3c2377030043f35a6b76c) | 185.77 ms | 0.00035 ms | 8,000 events, repeat lookups |
 | twinflow | [Resolve the hook interpreter once (L0)](https://github.com/ragonxdragon/twinflow/commit/3a3a28ee2ccccde51a855b728346dbbd2323cdab) | 2,787 ms | 1,202 ms | pre-commit wall clock, three runs each |
 | desktop app | Reparse only the unfinished block of a streaming answer (L1) | 33.3 ms | 1.0 ms | per frame at 16 KB, release build |
-| firmware | Serialize the status patch once into a sized buffer | 73 | 1 | allocations per patch, host-measured |
+| firmware | Skip the LED refresh when the pixel color is unchanged (L1) | 334 | 1 | refreshes per 10 s in the steady state, host bench |
 | firmware | Flush emulator notifications without an idle sleep | 56.0 ms | 5.1 ms | median of 100 queued notifications |
 | firmware | Batch WebSocket writes (L2) | 28 | 9 | modem send commands per full refresh, on device |
 | firmware | Build the upload scan in place (L1) | 2.92 s | 1.85 s | 1,000 tags, on device, median of 10 cycles |
 | firmware | Poll device registration every 0.5 s | 18.1 s | 13.8 s | randomized 2x2 factorial, Mann-Whitney p=0.0020 |
+| firmware | Read device twins in parallel during batch provisioning (L5) | 1x | 6.5x | throughput vs serial at 8 workers (11.7x at 16) |
 
-That last row is the measurement protocol doing its job: a single before and after timing earlier
+The registration row is the measurement protocol doing its job: a single before and after timing earlier
 the same day had picked the slower 3 s interval, and the factorial showed that comparison was
 noise.
 
-Four more firmware changes were measured going to zero, which a log axis can't show: heap
-allocations to build a 1,000-tag scan (2,000 to 0), internal heap held by a per-antenna map at
-500 tags (20 KB to 0), bytes copied per config callback (3.2 KB to 0), and CI cache restore time
-per job (17-19 s to 0).
+Five more firmware changes were measured going to zero, which a log axis can't show: allocations
+for 500 tags re-read 200 times (100,000 to 0, host bench), heap allocations to build a 1,000-tag
+scan (2,000 to 0), internal heap held by a per-antenna map at 500 tags (20 KB to 0), bytes copied
+per config callback (3.2 KB to 0), and CI cache restore time per job (17-19 s to 0).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="results/charts/marker-verdicts-dark.svg">
@@ -142,12 +143,12 @@ per job (17-19 s to 0).
 
 | Project | Perf commits | Measured changes | Estimated changes | Perf commits with no number |
 | --------- | -------------: | -----------------: | ------------------: | ----------------------------: |
-| firmware | 48 | 15 | 19 | 17 |
-| desktop app | 15 | 2 | 0 | 13 |
+| firmware | 63 | 17 | 29 | 22 |
+| desktop app | 41 | 2 | 0 | 39 |
 | twinflow | 2 | 3 | 0 | 0 |
 
-Measured points are few outside the firmware: 20 measured changes in all, 15 of them charted.
-The full dataset is [`results/results.csv`](results/results.csv) (59 rows) with per-project counts
+Measured points are few outside the firmware: 22 measured changes in all, 16 of them charted.
+The full dataset is [`results/results.csv`](results/results.csv) (79 rows) with per-project counts
 in [`results/summary.csv`](results/summary.csv).
 
 ### How the data was gathered, and its limits
@@ -157,16 +158,20 @@ in [`results/summary.csv`](results/summary.csv).
   repositories. This is one author's work after adopting the skill, chosen by commit type. It is
   not a controlled study, and there is no comparison against what the same work would have
   produced without the skill.
-- **Numbers as stated.** Every value comes from a commit message or a code marker. Methods vary and
+- **Numbers as stated.** Every value comes from a commit message or from the `PERF:` comment on
+  the changed code, found by searching every revision of each repository. Methods vary and
   are recorded in the `method` column: on-device bench medians, host benchmarks, build output,
   single-checkout measurements. A row is `measured` only when the commit says it was measured;
-  computed, approximate and by-construction figures are `estimated` and never appear in a chart.
+  computed, simulated, approximate and by-construction figures are `estimated` and never appear in
+  a chart. Where a commit message and its code comment disagree, the CSV keeps the commit message
+  and notes the other figure.
 - **Noise.** Two charted firmware results (1.04x and 1.06x) are medians without a stated
   significance test and sit below the 1.1x to 1.2x noise floor the skill itself uses, so treat them
   as unproven.
 - **Context for single rows.** The 530,771x twinflow figure compares recomputing a hash against
   reading a held value, so it applies to repeat calls. The gzip upload result is opt-in and off by
-  default. The startup JavaScript cut is deterministic, but the same commit found no launch-time
+  default. The parallel twin-read figure is throughput, so higher is better; the factor chart
+  inverts it to match the others. The startup JavaScript cut is deterministic, but the same commit found no launch-time
   change above run-to-run noise.
 - **Charts** show one headline metric per change, the first row for that change in the CSV.
 - **Markers.** Counts come from `git grep` over each project's main branch, excluding vendored and
