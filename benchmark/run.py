@@ -149,6 +149,82 @@ def sha256_file(p: Path) -> str:
     return hashlib.sha256(p.read_bytes()).hexdigest()
 
 
+# ------------------------------------------------------------- host power
+#
+# On a laptop, Windows Modern Standby and sleep pause the WSL VM. Monotonic clocks stop
+# during the pause and wall clocks do not, so a run measured in monotonic time (the
+# in-container `timeout`, Python's subprocess timeout) can last far longer in wall time,
+# and a workload timing that spans a pause or a battery-throttled CPU is not comparable.
+
+SUSPEND_TOLERANCE_SEC = 60
+KEEP_AWAKE_PS = (
+    "Add-Type -Namespace PlrBench -Name Power -MemberDefinition "
+    "'[DllImport(\"kernel32.dll\")] public static extern uint SetThreadExecutionState(uint f);'; "
+    "[PlrBench.Power]::SetThreadExecutionState(0x80000001) | Out-Null; "
+    "while ($true) { Start-Sleep -Seconds 30 }"
+)
+
+
+def powershell() -> str | None:
+    return shutil.which("powershell.exe")
+
+
+def on_battery() -> bool | None:
+    """True on battery, False on AC, None when unknown (no battery, or not under WSL)."""
+    ps = powershell()
+    if not ps:
+        return None
+    cmd = "(Get-CimInstance -Namespace root/wmi -ClassName BatteryStatus | Select-Object -First 1).PowerOnline"
+    try:
+        out = subprocess.run([ps, "-NoProfile", "-Command", cmd], check=False, capture_output=True, text=True,
+                             timeout=120).stdout.strip().lower()
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if out in ("true", "false"):
+        return out == "false"
+    return None
+
+
+def wait_for_ac(study: Study) -> None:
+    """Agent runs and timing runs only start on AC power."""
+    if not on_battery():
+        return
+    log("host is on battery; waiting for AC power before the next step")
+    study.state["waiting"] = {"until": "AC power", "reason": "host on battery"}
+    study.save()
+    while on_battery():
+        time.sleep(60)
+    study.state.pop("waiting", None)
+    study.save()
+    log("AC power is back")
+
+
+def start_keep_awake() -> subprocess.Popen | None:
+    """Ask Windows not to sleep while the study runs. Lid-close and critical-battery sleep still win."""
+    ps = powershell()
+    if not ps:
+        return None
+    proc = subprocess.Popen([ps, "-NoProfile", "-Command", KEEP_AWAKE_PS],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    import atexit
+
+    atexit.register(proc.terminate)
+    return proc
+
+
+class HostClock:
+    """Wall and monotonic time side by side; their difference is time the host spent paused."""
+
+    def __init__(self) -> None:
+        self.wall0, self.mono0 = time.time(), time.monotonic()
+
+    def wall(self) -> float:
+        return time.time() - self.wall0
+
+    def suspended(self) -> float:
+        return round(max(0.0, self.wall() - (time.monotonic() - self.mono0)), 1)
+
+
 # ------------------------------------------------------------- CPU pinning
 
 
@@ -707,18 +783,30 @@ def run_agent(study: Study, cfg: dict, row: dict, arm: str, k: int, cpuset: dict
         exec_cmd += ["-e", f"{k_}={v}"]
     exec_cmd += [name, "/bin/bash", "-lc", claude_cmd]
 
-    t0 = time.time()
+    # The in-container `timeout` counts monotonic time, which stops while the host sleeps.
+    # This watchdog enforces the same cap on wall-clock time, so a run can never outlast it.
+    clock = HostClock()
     meta["started_at"] = now_iso()
     with open(run_dir / "transcript.jsonl", "w") as out, open(run_dir / "stderr.log", "w") as err:
-        try:
-            proc = subprocess.run(exec_cmd, check=False, stdout=out, stderr=err, timeout=cfg["run_timeout_sec"] + 300)
-            meta["exit_code"] = proc.returncode
-        except subprocess.TimeoutExpired:
-            meta["exit_code"] = "host-timeout"
-            docker("exec", name, "pkill", "-f", "claude", check=False)
-    meta["wall_sec"] = round(time.time() - t0, 1)
+        proc = subprocess.Popen(exec_cmd, stdout=out, stderr=err)
+        while True:
+            try:
+                meta["exit_code"] = proc.wait(timeout=10)
+                break
+            except subprocess.TimeoutExpired:
+                if clock.wall() > cfg["run_timeout_sec"]:
+                    docker("exec", name, "pkill", "-TERM", "-f", "claude", check=False)
+                    with contextlib.suppress(subprocess.TimeoutExpired):
+                        proc.wait(timeout=30)
+                    if proc.poll() is None:
+                        proc.kill()
+                        proc.wait()
+                    meta["exit_code"] = "wall-clock-cap"
+                    break
+    meta["wall_sec"] = round(clock.wall(), 1)
+    meta["host_suspended_sec"] = clock.suspended()
     meta["finished_at"] = now_iso()
-    meta["timed_out"] = meta["exit_code"] in (124, 137, "host-timeout")
+    meta["timed_out"] = meta["exit_code"] in (124, 137, "wall-clock-cap")
 
     meta["credentials"] = sync_refreshed_credentials(name, sent_hash, cred_src)
 
@@ -791,14 +879,49 @@ def score(study: Study, cfg: dict, iid: str, model: str, patch_path: Path | None
         pred = {"instance_id": iid, "model_patch": patch_path.read_text(), "model_name_or_path": model}
         pred_file.write_text(json.dumps(pred) + "\n")
         args += ["--prediction_path", str(pred_file)]
-    t0 = time.time()
+    clock = HostClock()
     rc = swefficiency_cli(args, sdir, log_file, cfg["score_timeout_sec"] + 600)
-    res = {"eval_exit_code": rc, "eval_wall_sec": round(time.time() - t0, 1)}
+    res = {"eval_exit_code": rc, "eval_wall_sec": round(clock.wall(), 1), "host_suspended_sec": clock.suspended(),
+           "on_battery_after": on_battery()}
     inst_dir = sdir / "logs" / "run_evaluation" / study.name / model / iid
     perf = inst_dir / "perf_summary.txt"
     res["perf_summary"] = perf.read_text() if perf.exists() else None
     res["correctness_ran"] = (inst_dir / "covering_test_status.json").exists()
+    pre = inst_dir / "perf_output_preedit.txt"
+    if not perf.exists() and pre.exists() and "Killed" in pre.read_text(errors="replace"):
+        res["workload_killed"] = True
     return res
+
+
+def _p2p(row: dict) -> list[str]:
+    p2p = row["PASS_TO_PASS"]
+    return json.loads(p2p) if isinstance(p2p, str) else list(p2p)
+
+
+def host_correctness(study: Study, iid: str, model: str, row: dict) -> dict | None:
+    """Required tests that fail for the prediction but pass for the expert patch on this host.
+
+    The official rule needs every PASS_TO_PASS test to pass. Tests that also fail under
+    the expert patch here (memory-hungry tests on a 15 GB host, for example) say nothing
+    about the prediction, so this secondary view leaves them out. The official verdict
+    stays the primary result.
+    """
+    base = study.dir / "scoring" / "logs" / "run_evaluation" / study.name
+    gold_f = base / "gold" / iid / "covering_test_status.json"
+    pred_f = base / model / iid / "covering_test_status.json"
+    if not gold_f.exists() or not pred_f.exists():
+        return None
+    gold, pred = json.loads(gold_f.read_text()), json.loads(pred_f.read_text())
+    p2p = _p2p(row)
+    gold_fail = {t for t in p2p if "PASS" not in gold.get(t, "")}
+    pred_fail = {t for t in p2p if "PASS" not in pred.get(t, "")}
+    return {
+        "p2p_total": len(p2p),
+        "gold_failing": sorted(gold_fail),
+        "pred_failing": sorted(pred_fail),
+        "pred_failing_beyond_gold": sorted(pred_fail - gold_fail),
+        "correct_host_adjusted": not (pred_fail - gold_fail),
+    }
 
 
 def report_row(study: Study, iid: str, model: str) -> dict | None:
@@ -864,6 +987,7 @@ def cmd_run(args) -> None:
     if rev_now != tasks_doc["method"]["dataset_revision"]:
         log(f"WARNING: dataset revision moved ({rev_now}); the official harness loads the latest revision")
     rows = load_dataset_rows(tasks_doc["method"]["dataset_revision"])
+    start_keep_awake()
 
     for t in tasks:
         iid = t["instance_id"]
@@ -906,6 +1030,7 @@ def cmd_run(args) -> None:
                     s["attempts"] = s.get("attempts", 0) + 1
                     s["status"] = "running"
                     study.save()
+                    wait_for_ac(study)
                     log(f"{iid}: agent {arm} r{k} (attempt {s['attempts']})")
                     meta = run_agent(study, cfg, row, arm, k, cpuset)
                     s["last"] = {key_: meta.get(key_) for key_ in ("outcome", "wall_sec", "num_turns", "reset_at")}
@@ -939,27 +1064,42 @@ def cmd_run(args) -> None:
         ]
         for model, patch in jobs:
             key = f"score:{model}"
-            if study.done(iid, key):
+            if study.done(iid, key) or st.get("unscorable"):
                 continue
             s = study.step(iid, key)
-            s["status"] = "running"
-            study.save()
-            log(f"{iid}: scoring {model}")
-            res = score(study, cfg, iid, model, patch)
-            s.update(res)
+            for attempt in range(1, 4):
+                wait_for_ac(study)
+                s.update(status="running", attempts=attempt)
+                study.save()
+                log(f"{iid}: scoring {model} (attempt {attempt})")
+                res = score(study, cfg, iid, model, patch)
+                s.update(res)
+                # A timing run that spans a host pause or ends on battery is not comparable; redo it.
+                if res["host_suspended_sec"] <= SUSPEND_TOLERANCE_SEC and not res["on_battery_after"]:
+                    break
+                s.setdefault("discarded", []).append({"at": now_iso(), "host_suspended_sec": res["host_suspended_sec"],
+                                                      "on_battery_after": res["on_battery_after"]})
+                log(f"{iid}: {model} timing spanned a host pause or battery power; scoring again")
             s["status"] = "done" if res["eval_exit_code"] == 0 else "error"
             s["at"] = now_iso()
             study.save()
             if res["eval_exit_code"] != 0:
                 sys.exit(f"{iid}: official eval failed for {model}; see {study.dir / 'scoring'}")
+            if model == "gold" and not res["perf_summary"]:
+                reason = ("the workload was killed (out of memory) on this host" if res.get("workload_killed")
+                          else "the expert patch produced no timing on this host")
+                st["unscorable"] = reason
+                study.save()
+                log(f"{iid}: not scorable here: {reason}; skipping prediction scoring")
 
         for model, _ in jobs[1:]:
             key = f"report:{model}"
-            if study.done(iid, key):
+            if study.done(iid, key) or st.get("unscorable"):
                 continue
             row_out = report_row(study, iid, model)
             s = study.step(iid, key)
-            s.update(status="done" if row_out else "error", row=row_out, at=now_iso())
+            s.update(status="done" if row_out else "error", row=row_out,
+                     host=host_correctness(study, iid, model, row), at=now_iso())
             study.save()
 
         # 4. cleanup
@@ -995,14 +1135,23 @@ def export_runs(study: Study) -> None:
                 continue
             _, arm, k = key.split(":")
             m = s["metrics"]
-            rep = (steps.get(f"report:{model_name(arm, int(k))}") or {}).get("row") or {}
+            report = steps.get(f"report:{model_name(arm, int(k))}") or {}
+            rep = report.get("row") or {}
+            host = report.get("host") or {}
+            wall, cli_ms = m.get("wall_sec"), m.get("duration_ms")
             out.append({
                 "study": study.name, "instance_id": iid, "position": t.get("position"), "arm": arm, "run": int(k),
                 "outcome": m.get("outcome"), "attempts": s.get("attempts"),
+                "unscorable": t.get("unscorable"),
                 "correct": rep.get("correctness"), "correctness_pct": rep.get("correctness_pct"),
+                "correct_host_adjusted": host.get("correct_host_adjusted"),
+                "failing_required_tests": len(host["pred_failing"]) if host else None,
+                "failing_required_tests_gold": len(host["gold_failing"]) if host else None,
                 "raw_speedup": rep.get("raw_pred_speedup_ratio"), "speedup": rep.get("pred_speedup_ratio"),
                 "gold_speedup": rep.get("gold_speedup_ratio"), "speedup_vs_expert": rep.get("human_speedup_ratio"),
-                "wall_sec": m.get("wall_sec"), "duration_ms": m.get("duration_ms"), "num_turns": m.get("num_turns"),
+                "wall_sec": wall, "duration_ms": cli_ms, "num_turns": m.get("num_turns"),
+                "host_suspended_sec": m.get("host_suspended_sec"),
+                "wall_minus_cli_sec": round(wall - cli_ms / 1000, 1) if wall is not None and cli_ms else None,
                 "input_tokens": m.get("input_tokens"), "output_tokens": m.get("output_tokens"),
                 "cache_creation_input_tokens": m.get("cache_creation_input_tokens"),
                 "cache_read_input_tokens": m.get("cache_read_input_tokens"),
@@ -1071,6 +1220,22 @@ def cmd_reanalyze(args) -> None:
             s["metrics"].update(analyze_transcript(lines, tracked))
             s["metrics"]["tracked_list_available"] = tracked_file.exists()
             atomic_write_json(run_dir / "metrics.json", s["metrics"])
+    # Backfill the scoring checks added after the first studies ran.
+    rows = None
+    base = study.dir / "scoring" / "logs" / "run_evaluation" / study.name
+    for iid, t in (study.state.get("tasks") or {}).items():
+        gold_dir = base / "gold" / iid
+        if not (gold_dir / "perf_summary.txt").exists():
+            pre = gold_dir / "perf_output_preedit.txt"
+            killed = pre.exists() and "Killed" in pre.read_text(errors="replace")
+            t["unscorable"] = ("the workload was killed (out of memory) on this host" if killed
+                               else "the expert patch produced no timing on this host")
+            continue
+        for key, s in t["steps"].items():
+            if key.startswith("report:") and s.get("status") == "done":
+                if rows is None:
+                    rows = load_dataset_rows(study.state["config"]["dataset_revision"])
+                s["host"] = host_correctness(study, iid, key.split(":", 1)[1], rows[iid])
     study.save()
     export_runs(study)
     log(f"reanalyzed {study.name}")
