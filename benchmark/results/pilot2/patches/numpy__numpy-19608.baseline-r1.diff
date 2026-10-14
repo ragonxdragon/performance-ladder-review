@@ -1,0 +1,112 @@
+diff --git a/numpy/lib/npyio.py b/numpy/lib/npyio.py
+index 225b22a5c..cc828f35a 100644
+--- a/numpy/lib/npyio.py
++++ b/numpy/lib/npyio.py
+@@ -728,14 +728,16 @@ def _savez(file, args, kwds, compress, allow_pickle=True, pickle_kwargs=None):
+     zipf.close()
+ 
+ 
++def _floatconv(x):
++    if '0x' in x:
++        return float.fromhex(x)
++    return float(x)
++
++
+ def _getconv(dtype):
+     """ Find the correct dtype converter. Adapted from matplotlib """
+ 
+-    def floatconv(x):
+-        x.lower()
+-        if '0x' in x:
+-            return float.fromhex(x)
+-        return float(x)
++    floatconv = _floatconv
+ 
+     typ = dtype.type
+     if issubclass(typ, np.bool_):
+@@ -972,7 +974,8 @@ def loadtxt(fname, dtype=float, comments='#', delimiter=None,
+ 
+     def split_line(line):
+         """Chop off comments, strip, and split at delimiter. """
+-        line = _decode_line(line, encoding=encoding)
++        if type(line) is bytes:
++            line = line.decode(line_encoding)
+         for comment in comments:  # Much faster than using a single regex.
+             line = line.split(comment, 1)[0]
+         line = line.strip('\r\n')
+@@ -991,11 +994,40 @@ def read_data(chunk_size):
+ 
+         """
+         X = []
++        append = X.append
+         line_iter = itertools.chain([first_line], fh)
+         line_iter = itertools.islice(line_iter, max_rows)
++
++        # Use the builtin float where the semantics are identical; on
++        # ValueError (e.g. hex floats) fall back to the full converters.
++        fast_converters = [float if conv is _floatconv else conv
++                           for conv in converters]
++        same_conv = all(c is fast_converters[0] for c in fast_converters)
++        fast_conv = fast_converters[0] if fast_converters else None
++        if packing is None:
++            pack = itemgetter(0)
++        elif packing == [(N, tuple)] or (
++                type(packing) is list
++                and all(p == (1, None) for p in packing)):
++            pack = tuple
++        else:
++            pack = functools.partial(_loadtxt_pack_items, packing=packing)
++        single_comment = comments[0] if len(comments) == 1 else None
++        delim = delimiter
++
+         for i, line in enumerate(line_iter):
+-            vals = split_line(line)
+-            if len(vals) == 0:
++            if type(line) is bytes:
++                line = line.decode(line_encoding)
++            if single_comment is not None:
++                line = line.partition(single_comment)[0]
++            else:
++                for comment in comments:
++                    line = line.split(comment, 1)[0]
++            line = line.strip('\r\n')
++            if not line:
++                continue
++            vals = line.split(delim)
++            if not vals:
+                 continue
+             if usecols:
+                 vals = [vals[j] for j in usecols]
+@@ -1005,14 +1037,21 @@ def read_data(chunk_size):
+                                  % line_num)
+ 
+             # Convert each value according to its column and store
+-            items = [conv(val) for (conv, val) in zip(converters, vals)]
++            try:
++                if same_conv:
++                    items = list(map(fast_conv, vals))
++                else:
++                    items = [conv(val) for (conv, val)
++                             in zip(fast_converters, vals)]
++            except ValueError:
++                items = [conv(val) for (conv, val) in zip(converters, vals)]
+ 
+             # Then pack it according to the dtype's nesting
+-            items = _loadtxt_pack_items(items, packing)
+-            X.append(items)
++            append(pack(items))
+             if len(X) > chunk_size:
+                 yield X
+                 X = []
++                append = X.append
+         if X:
+             yield X
+ 
+@@ -1041,6 +1080,7 @@ def read_data(chunk_size):
+     if encoding == 'bytes':
+         encoding = None
+         byte_converters = True
++    line_encoding = encoding or "latin1"
+ 
+     if usecols is not None:
+         # Allow usecols to be a single int or a sequence of ints

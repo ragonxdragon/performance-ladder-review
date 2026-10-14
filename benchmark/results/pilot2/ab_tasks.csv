@@ -1,0 +1,3 @@
+instance_id,baseline_runs,baseline_sr,baseline_mean_log_sr,baseline_correct_rate,skill_runs,skill_sr,skill_mean_log_sr,skill_correct_rate,sr_diff,sr_ratio,log_diff,result
+numpy__numpy-19608,1,0.9963925488839325,-0.003613973659073085,0.0,1,0.9963925488839325,-0.003613973659073085,0.0,0.0,1.0,0.0,tie
+pydata__xarray-9808,0,,,0.0,0,,,0.0,,,,

@@ -1,0 +1,86 @@
+diff --git a/xarray/core/dataset.py b/xarray/core/dataset.py
+index 5056a80a..fa8c1d94 100644
+--- a/xarray/core/dataset.py
++++ b/xarray/core/dataset.py
+@@ -2,6 +2,7 @@ from __future__ import annotations
+ 
+ import copy
+ import datetime
++import functools
+ import inspect
+ import itertools
+ import math
+@@ -232,6 +233,15 @@ def _get_virtual_variable(
+     return ref_name, var_name, virtual_var
+ 
+ 
++@functools.lru_cache(maxsize=16)
++def _normalize_chunks_cached(chunkmanager, chunk_shape, shape, dtype, previous_chunks):
++    # Returning the same tuple objects for variables with identical chunking lets
++    # dask's identity-based caches (e.g. cumulative sums) be reused across variables.
++    return chunkmanager.normalize_chunks(
++        chunk_shape, shape=shape, dtype=dtype, previous_chunks=previous_chunks
++    )
++
++
+ def _get_chunk(var: Variable, chunks, chunkmanager: ChunkManagerEntrypoint):
+     """
+     Return map from each dim to chunk sizes, accounting for backend's preferred chunks.
+@@ -254,9 +264,20 @@ def _get_chunk(var: Variable, chunks, chunkmanager: ChunkManagerEntrypoint):
+         for dim, preferred_chunk_sizes in zip(dims, preferred_chunk_shape, strict=True)
+     )
+ 
+-    chunk_shape = chunkmanager.normalize_chunks(
+-        chunk_shape, shape=shape, dtype=var.dtype, previous_chunks=preferred_chunk_shape
+-    )
++    try:
++        # "auto" chunks depend on global configuration, so are never cached
++        if any(isinstance(c, str) for c in chunk_shape):
++            raise TypeError
++        chunk_shape = _normalize_chunks_cached(
++            chunkmanager, chunk_shape, shape, var.dtype, preferred_chunk_shape
++        )
++    except TypeError:  # unhashable or uncacheable chunks
++        chunk_shape = chunkmanager.normalize_chunks(
++            chunk_shape,
++            shape=shape,
++            dtype=var.dtype,
++            previous_chunks=preferred_chunk_shape,
++        )
+ 
+     # Warn where requested chunks break preferred chunks, provided that the variable
+     # contains data.
+@@ -269,17 +290,25 @@ def _get_chunk(var: Variable, chunks, chunkmanager: ChunkManagerEntrypoint):
+             # Determine the stop indices of the preferred chunks, but omit the last stop
+             # (equal to the dim size).  In particular, assume that when a sequence
+             # expresses the preferred chunks, the sequence sums to the size.
+-            preferred_stops = (
+-                range(preferred_chunk_sizes, size, preferred_chunk_sizes)
+-                if isinstance(preferred_chunk_sizes, int)
+-                else itertools.accumulate(preferred_chunk_sizes[:-1])
+-            )
+             # Gather any stop indices of the specified chunks that are not a stop index
+             # of a preferred chunk.  Again, omit the last stop, assuming that it equals
+             # the dim size.
+-            breaks = set(itertools.accumulate(chunk_sizes[:-1])).difference(
+-                preferred_stops
+-            )
++            if isinstance(preferred_chunk_sizes, int):
++                # every stop is a multiple of the preferred size if all chunk sizes are
++                if all(
++                    c > 0 and c % preferred_chunk_sizes == 0
++                    for c in set(chunk_sizes[:-1])
++                ):
++                    continue
++                breaks = {
++                    stop
++                    for stop in itertools.accumulate(chunk_sizes[:-1])
++                    if stop % preferred_chunk_sizes or stop <= 0
++                }
++            else:
++                breaks = set(itertools.accumulate(chunk_sizes[:-1])).difference(
++                    itertools.accumulate(preferred_chunk_sizes[:-1])
++                )
+             if breaks:
+                 warnings.warn(
+                     "The specified chunks separate the stored chunks along "

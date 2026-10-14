@@ -6,7 +6,8 @@ median_speedup_vs_expert,1.6424485163079539,1.083929044444962,-0.558519471862991
 harmonic_mean_speedup_vs_expert,0.6198750466632196,0.14295280004282895,-0.4769222466203906,,,2,the official SWE-fficiency aggregate (floor 0.001)
 win_tie_loss,,,0/0/2,,,2,skill vs baseline per task; tie = within 5 percent
 runs,2,2,,,,,agent runs completed
-correct_rate,1.0,1.0,,,,,per run
+correct_rate,1.0,1.0,,,,,"official verdict, per scorable run"
+correct_rate_host_adjusted,1.0,1.0,,,,,ignores tests that also fail for the expert patch on this host
 mean_input_tokens,22.0,20.0,-2.0,,,,per run
 median_input_tokens,22.0,20.0,,,,,per run
 mean_output_tokens,4886.0,3791.5,-1094.5,,,,per run

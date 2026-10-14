@@ -1,0 +1,127 @@
+diff --git a/xarray/backends/api.py b/xarray/backends/api.py
+index 785ab391..aa916aed 100644
+--- a/xarray/backends/api.py
++++ b/xarray/backends/api.py
+@@ -360,8 +360,18 @@ def _chunk_ds(
+         name_prefix = None
+ 
+     variables = {}
++    # PERF: L1 - variables with equal chunks along a dimension share one tuple object.
++    # dask caches cumulative block offsets by tuple identity, so sharing computes them
++    # once and keeps one copy of the (possibly million-entry) tuple alive, not one per variable.
++    shared_chunks: dict[Any, Any] = {}
+     for name, var in backend_ds.variables.items():
+         var_chunks = _get_chunk(var, chunks, chunkmanager)
++        var_chunks = {
++            dim: shared_chunks.setdefault(dim_chunks, dim_chunks)
++            if isinstance(dim_chunks, tuple)
++            else dim_chunks
++            for dim, dim_chunks in var_chunks.items()
++        }
+         variables[name] = _maybe_chunk(
+             name,
+             var,
+diff --git a/xarray/core/dataset.py b/xarray/core/dataset.py
+index 5056a80a..c0054958 100644
+--- a/xarray/core/dataset.py
++++ b/xarray/core/dataset.py
+@@ -266,6 +266,15 @@ def _get_chunk(var: Variable, chunks, chunkmanager: ChunkManagerEntrypoint):
+                 preferred_chunk_sizes = preferred_chunks[dim]
+             except KeyError:
+                 continue
++            # PERF: L1 - when every chunk but the last has the preferred size, no stop
++            # can break a preferred chunk; a C-level tuple.count replaces building
++            # a set of every stop index (O(n_chunks) set + difference per variable).
++            if (
++                isinstance(preferred_chunk_sizes, int)
++                and isinstance(chunk_sizes, tuple)
++                and chunk_sizes[:-1].count(preferred_chunk_sizes) == len(chunk_sizes) - 1
++            ):
++                continue
+             # Determine the stop indices of the preferred chunks, but omit the last stop
+             # (equal to the dim size).  In particular, assume that when a sequence
+             # expresses the preferred chunks, the sequence sums to the size.
+@@ -303,7 +312,7 @@ def _maybe_chunk(
+     chunked_array_type: str | ChunkManagerEntrypoint | None = None,
+     from_array_kwargs=None,
+ ) -> Variable:
+-    from xarray.namedarray.daskmanager import DaskManager
++    from xarray.namedarray.daskmanager import DaskManager, _normalize_block_sizes
+ 
+     if chunks is not None:
+         chunks = {dim: chunks[dim] for dim in var.dims if dim in chunks}
+@@ -318,8 +327,18 @@ def _maybe_chunk(
+             # when rechunking by different amounts, make sure dask names change
+             # by providing chunks as an input to tokenize.
+             # subtle bugs result otherwise. see GH3350
+-            # we use str() for speed, and use the name for the final array name on the next line
+-            token2 = tokenize(token if token else var._data, str(chunks))
++            # we use str() for speed, and use the name for the final array name on the next line.
++            # PERF: L1 - explicit block sizes are summarised before str(); repr of a
++            # million-entry tuple costs tens of milliseconds per variable.
++            chunks_repr = (
++                {
++                    dim: _normalize_block_sizes(c) if isinstance(c, tuple) else c
++                    for dim, c in chunks.items()
++                }
++                if chunks is not None
++                else None
++            )
++            token2 = tokenize(token if token else var._data, str(chunks_repr))
+             name2 = f"{name_prefix}{name}-{token2}"
+ 
+             from_array_kwargs = utils.consolidate_dask_from_array_kwargs(
+diff --git a/xarray/namedarray/daskmanager.py b/xarray/namedarray/daskmanager.py
+index 6485ba37..fc61dd6b 100644
+--- a/xarray/namedarray/daskmanager.py
++++ b/xarray/namedarray/daskmanager.py
+@@ -26,6 +26,41 @@ if TYPE_CHECKING:
+ dask_available = module_available("dask")
+ 
+ 
++def _normalize_block_sizes(sizes: tuple[int, ...]) -> tuple[Any, ...]:
++    """Injective, compact stand-in for a tuple of block sizes.
++
++    Regular chunking (all blocks equal except possibly a shorter last one) is
++    reduced to a few numbers; anything else is kept verbatim.
++    """
++    n = len(sizes)
++    if n > 1:
++        first = sizes[0]
++        count = sizes.count(first)
++        if count == n:
++            return ("uniform", first, n)
++        if count == n - 1 and sizes[-1] != first:
++            return ("uniform+tail", first, n - 1, sizes[-1])
++    return ("irregular", sizes)
++
++
++def _register_array_slice_dep_token() -> None:
++    """Give dask's ``ArraySliceDep`` a cheap deterministic token.
++
++    ``da.from_array`` tokenizes ``ArraySliceDep(chunks)``; dask's default pickle
++    round trip is linear in the number of blocks and takes hundreds of
++    milliseconds per array for stores chunked into millions of blocks.
++    """
++    try:
++        from dask.base import normalize_token
++        from dask.layers import ArraySliceDep
++    except ImportError:  # pragma: no cover
++        return
++
++    @normalize_token.register(ArraySliceDep)
++    def _normalize_array_slice_dep(dep: Any) -> tuple[Any, ...]:
++        return ("ArraySliceDep", *(_normalize_block_sizes(c) for c in dep.chunks))
++
++
+ class DaskManager(ChunkManagerEntrypoint["DaskArray"]):
+     array_cls: type[DaskArray]
+     available: bool = dask_available
+@@ -36,6 +71,7 @@ class DaskManager(ChunkManagerEntrypoint["DaskArray"]):
+         from dask.array import Array
+ 
+         self.array_cls = Array
++        _register_array_slice_dep_token()
+ 
+     def is_chunked_array(self, data: duckarray[Any, Any]) -> bool:
+         return is_duck_dask_array(data)
