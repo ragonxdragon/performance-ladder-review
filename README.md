@@ -97,14 +97,14 @@ Start a new Claude Code session and run `/performance-ladder-review perf-help` t
 ## Results in real projects
 
 The skill has run since 2026-07-21 on three of the author's projects: a cellular IoT gateway
-firmware (ESP32, client work, private), a desktop AI model manager (Rust and TypeScript, private),
+firmware (ESP32, client work, private), a desktop AI model manager (private),
 and [twinflow](https://github.com/ragonxdragon/twinflow) (Python, public). Every number below was
 written at the time of the change, in a commit message or in the `PERF:` comment on the changed
 code. Nothing was re-run or estimated for this page.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="results/charts/before-after-dark.svg">
-  <img alt="Dumbbell chart of before and after values for 16 measured changes, grouped into time, size, and counts, each on a log scale" src="results/charts/before-after-light.svg">
+  <img alt="Dumbbell chart of before and after values for 17 measured changes, grouped into time, size, and counts, each on a log scale" src="results/charts/before-after-light.svg">
 </picture>
 
 <picture>
@@ -120,6 +120,7 @@ The strongest measured results:
 | twinflow | [Hold the event-log hash until an append changes it (L1)](https://github.com/ragonxdragon/twinflow/commit/03df49a3540ab08307d3c2377030043f35a6b76c) | 185.77 ms | 0.00035 ms | 8,000 events, repeat lookups |
 | twinflow | [Resolve the hook interpreter once (L0)](https://github.com/ragonxdragon/twinflow/commit/3a3a28ee2ccccde51a855b728346dbbd2323cdab) | 2,787 ms | 1,202 ms | pre-commit wall clock, three runs each |
 | desktop app | Reparse only the unfinished block of a streaming answer (L1) | 33.3 ms | 1.0 ms | per frame at 16 KB, release build |
+| firmware | Walk the parsed inventory once instead of indexing per tag (L3) | 341x | 1x | relative time at 4,000 tags, host benchmark |
 | firmware | Skip the LED refresh when the pixel color is unchanged (L1) | 334 | 1 | refreshes per 10 s in the steady state, host bench |
 | firmware | Flush emulator notifications without an idle sleep | 56.0 ms | 5.1 ms | median of 100 queued notifications |
 | firmware | Batch WebSocket writes (L2) | 28 | 9 | modem send commands per full refresh, on device |
@@ -143,12 +144,12 @@ per config callback (3.2 KB to 0), and CI cache restore time per job (17-19 s to
 
 | Project | Perf commits | Measured changes | Estimated changes | Perf commits with no number |
 | --------- | -------------: | -----------------: | ------------------: | ----------------------------: |
-| firmware | 63 | 17 | 29 | 22 |
+| firmware | 63 | 18 | 29 | 21 |
 | desktop app | 41 | 2 | 3 | 36 |
 | twinflow | 2 | 3 | 0 | 0 |
 
-Measured points are few outside the firmware: 22 measured changes in all, 16 of them charted.
-The full dataset is [`results/results.csv`](results/results.csv) (82 rows) with per-project counts
+Measured points are few outside the firmware: 23 measured changes in all, 17 of them charted.
+The full dataset is [`results/results.csv`](results/results.csv) (83 rows) with per-project counts
 in [`results/summary.csv`](results/summary.csv).
 
 ### How the data was gathered, and its limits
@@ -158,8 +159,10 @@ in [`results/summary.csv`](results/summary.csv).
   repositories. This is one author's work after adopting the skill, chosen by commit type. It is
   not a controlled study, and there is no comparison against what the same work would have
   produced without the skill.
-- **Numbers as stated.** Every value comes from a commit message or from the `PERF:` comment on
-  the changed code, found by searching every revision of each repository. Methods vary and
+- **Numbers as stated.** Every value comes from a commit message, from the `PERF:` comment on the
+  changed code, or from the project's own release documentation, found by searching every revision
+  of each repository. Retained Claude Code session logs were searched too; they only go back to
+  mid-September and confirmed figures already in the commits. Methods vary and
   are recorded in the `method` column: on-device bench medians, host benchmarks, build output,
   single-checkout measurements. A row is `measured` only when the commit says it was measured;
   computed, simulated, approximate and by-construction figures are `estimated` and never appear in
