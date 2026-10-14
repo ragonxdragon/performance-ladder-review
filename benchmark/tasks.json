@@ -1,0 +1,359 @@
+{
+  "method": {
+    "source_list": "Cross-machine original-rule valid SWE-fficiency tasks from the reliability audit (arXiv 2607.01211), the 'replay-stable' set: the reference patch met the benchmark's own validity rule in all 12 replays (4 GCP machine types x 3 rounds).",
+    "source_url": "https://raw.githubusercontent.com/chenzhi-cz/performance-optimization-benchmark-reliability/44a1cb86a9f765b0375b4cfb479641f3c19f0774/data/swefficiency_cross_machine_valid_tasks.csv",
+    "source_count": 411,
+    "dataset": "swefficiency/swefficiency",
+    "dataset_revision": "7fbfe6c2f1f409afb17acc4c3f737991ec6e1c27",
+    "sampling": "stratified by repo, proportional allocation (largest remainder, minimum 1 per repo), random.Random(seed).sample within each repo over the sorted instance ids",
+    "seed": 20261014,
+    "n": 40,
+    "per_repo_population": {
+      "astropy/astropy": 28,
+      "dask/dask": 17,
+      "matplotlib/matplotlib": 15,
+      "numpy/numpy": 13,
+      "pandas-dev/pandas": 236,
+      "pydata/xarray": 10,
+      "scikit-learn/scikit-learn": 23,
+      "scipy/scipy": 35,
+      "sympy/sympy": 34
+    },
+    "per_repo_sample": {
+      "astropy/astropy": 3,
+      "dask/dask": 2,
+      "matplotlib/matplotlib": 2,
+      "numpy/numpy": 1,
+      "pandas-dev/pandas": 23,
+      "pydata/xarray": 1,
+      "scikit-learn/scikit-learn": 2,
+      "scipy/scipy": 3,
+      "sympy/sympy": 3
+    },
+    "order": "first two = smallest compressed image size (pilot); the rest shuffled with seed+1",
+    "image_size_source": "sum of compressed layer sizes in the ghcr.io manifest at selection time",
+    "selected_at": "2026-10-14T04:22:41+00:00"
+  },
+  "tasks": [
+    {
+      "position": 1,
+      "instance_id": "sympy__sympy-12640",
+      "repo": "sympy/sympy",
+      "image": "ghcr.io/swefficiency/swefficiency-images:sympy__sympy-12640",
+      "image_compressed_bytes": 1386430719,
+      "pilot": true
+    },
+    {
+      "position": 2,
+      "instance_id": "astropy__astropy-6941",
+      "repo": "astropy/astropy",
+      "image": "ghcr.io/swefficiency/swefficiency-images:astropy__astropy-6941",
+      "image_compressed_bytes": 1398537789,
+      "pilot": true
+    },
+    {
+      "position": 3,
+      "instance_id": "pandas-dev__pandas-43160",
+      "repo": "pandas-dev/pandas",
+      "image": "ghcr.io/swefficiency/swefficiency-images:pandas-dev__pandas-43160",
+      "image_compressed_bytes": 2720180131,
+      "pilot": false
+    },
+    {
+      "position": 4,
+      "instance_id": "pandas-dev__pandas-56345",
+      "repo": "pandas-dev/pandas",
+      "image": "ghcr.io/swefficiency/swefficiency-images:pandas-dev__pandas-56345",
+      "image_compressed_bytes": 2853748161,
+      "pilot": false
+    },
+    {
+      "position": 5,
+      "instance_id": "scipy__scipy-16790",
+      "repo": "scipy/scipy",
+      "image": "ghcr.io/swefficiency/swefficiency-images:scipy__scipy-16790",
+      "image_compressed_bytes": 2275642846,
+      "pilot": false
+    },
+    {
+      "position": 6,
+      "instance_id": "pandas-dev__pandas-38353",
+      "repo": "pandas-dev/pandas",
+      "image": "ghcr.io/swefficiency/swefficiency-images:pandas-dev__pandas-38353",
+      "image_compressed_bytes": 2943015132,
+      "pilot": false
+    },
+    {
+      "position": 7,
+      "instance_id": "pandas-dev__pandas-44610",
+      "repo": "pandas-dev/pandas",
+      "image": "ghcr.io/swefficiency/swefficiency-images:pandas-dev__pandas-44610",
+      "image_compressed_bytes": 2722008931,
+      "pilot": false
+    },
+    {
+      "position": 8,
+      "instance_id": "pandas-dev__pandas-42293",
+      "repo": "pandas-dev/pandas",
+      "image": "ghcr.io/swefficiency/swefficiency-images:pandas-dev__pandas-42293",
+      "image_compressed_bytes": 2729094513,
+      "pilot": false
+    },
+    {
+      "position": 9,
+      "instance_id": "pandas-dev__pandas-54835",
+      "repo": "pandas-dev/pandas",
+      "image": "ghcr.io/swefficiency/swefficiency-images:pandas-dev__pandas-54835",
+      "image_compressed_bytes": 2765642064,
+      "pilot": false
+    },
+    {
+      "position": 10,
+      "instance_id": "dask__dask-7172",
+      "repo": "dask/dask",
+      "image": "ghcr.io/swefficiency/swefficiency-images:dask__dask-7172",
+      "image_compressed_bytes": 1993683312,
+      "pilot": false
+    },
+    {
+      "position": 11,
+      "instance_id": "matplotlib__matplotlib-22108",
+      "repo": "matplotlib/matplotlib",
+      "image": "ghcr.io/swefficiency/swefficiency-images:matplotlib__matplotlib-22108",
+      "image_compressed_bytes": 3543889467,
+      "pilot": false
+    },
+    {
+      "position": 12,
+      "instance_id": "scipy__scipy-19776",
+      "repo": "scipy/scipy",
+      "image": "ghcr.io/swefficiency/swefficiency-images:scipy__scipy-19776",
+      "image_compressed_bytes": 2354718453,
+      "pilot": false
+    },
+    {
+      "position": 13,
+      "instance_id": "matplotlib__matplotlib-21564",
+      "repo": "matplotlib/matplotlib",
+      "image": "ghcr.io/swefficiency/swefficiency-images:matplotlib__matplotlib-21564",
+      "image_compressed_bytes": 3118337555,
+      "pilot": false
+    },
+    {
+      "position": 14,
+      "instance_id": "pandas-dev__pandas-40818",
+      "repo": "pandas-dev/pandas",
+      "image": "ghcr.io/swefficiency/swefficiency-images:pandas-dev__pandas-40818",
+      "image_compressed_bytes": 2969847611,
+      "pilot": false
+    },
+    {
+      "position": 15,
+      "instance_id": "scipy__scipy-14004",
+      "repo": "scipy/scipy",
+      "image": "ghcr.io/swefficiency/swefficiency-images:scipy__scipy-14004",
+      "image_compressed_bytes": 2046805562,
+      "pilot": false
+    },
+    {
+      "position": 16,
+      "instance_id": "scikit-learn__scikit-learn-29330",
+      "repo": "scikit-learn/scikit-learn",
+      "image": "ghcr.io/swefficiency/swefficiency-images:scikit-learn__scikit-learn-29330",
+      "image_compressed_bytes": 1964366682,
+      "pilot": false
+    },
+    {
+      "position": 17,
+      "instance_id": "pandas-dev__pandas-33032",
+      "repo": "pandas-dev/pandas",
+      "image": "ghcr.io/swefficiency/swefficiency-images:pandas-dev__pandas-33032",
+      "image_compressed_bytes": 2653036286,
+      "pilot": false
+    },
+    {
+      "position": 18,
+      "instance_id": "pandas-dev__pandas-51722",
+      "repo": "pandas-dev/pandas",
+      "image": "ghcr.io/swefficiency/swefficiency-images:pandas-dev__pandas-51722",
+      "image_compressed_bytes": 2766241292,
+      "pilot": false
+    },
+    {
+      "position": 19,
+      "instance_id": "scikit-learn__scikit-learn-22235",
+      "repo": "scikit-learn/scikit-learn",
+      "image": "ghcr.io/swefficiency/swefficiency-images:scikit-learn__scikit-learn-22235",
+      "image_compressed_bytes": 1943876468,
+      "pilot": false
+    },
+    {
+      "position": 20,
+      "instance_id": "pandas-dev__pandas-43274",
+      "repo": "pandas-dev/pandas",
+      "image": "ghcr.io/swefficiency/swefficiency-images:pandas-dev__pandas-43274",
+      "image_compressed_bytes": 2720299560,
+      "pilot": false
+    },
+    {
+      "position": 21,
+      "instance_id": "pandas-dev__pandas-26773",
+      "repo": "pandas-dev/pandas",
+      "image": "ghcr.io/swefficiency/swefficiency-images:pandas-dev__pandas-26773",
+      "image_compressed_bytes": 2688180113,
+      "pilot": false
+    },
+    {
+      "position": 22,
+      "instance_id": "pandas-dev__pandas-52469",
+      "repo": "pandas-dev/pandas",
+      "image": "ghcr.io/swefficiency/swefficiency-images:pandas-dev__pandas-52469",
+      "image_compressed_bytes": 2670293903,
+      "pilot": false
+    },
+    {
+      "position": 23,
+      "instance_id": "pandas-dev__pandas-47234",
+      "repo": "pandas-dev/pandas",
+      "image": "ghcr.io/swefficiency/swefficiency-images:pandas-dev__pandas-47234",
+      "image_compressed_bytes": 2723524884,
+      "pilot": false
+    },
+    {
+      "position": 24,
+      "instance_id": "pandas-dev__pandas-51339",
+      "repo": "pandas-dev/pandas",
+      "image": "ghcr.io/swefficiency/swefficiency-images:pandas-dev__pandas-51339",
+      "image_compressed_bytes": 2670452644,
+      "pilot": false
+    },
+    {
+      "position": 25,
+      "instance_id": "pandas-dev__pandas-48472",
+      "repo": "pandas-dev/pandas",
+      "image": "ghcr.io/swefficiency/swefficiency-images:pandas-dev__pandas-48472",
+      "image_compressed_bytes": 2916315795,
+      "pilot": false
+    },
+    {
+      "position": 26,
+      "instance_id": "pandas-dev__pandas-46174",
+      "repo": "pandas-dev/pandas",
+      "image": "ghcr.io/swefficiency/swefficiency-images:pandas-dev__pandas-46174",
+      "image_compressed_bytes": 2717963254,
+      "pilot": false
+    },
+    {
+      "position": 27,
+      "instance_id": "pandas-dev__pandas-44758",
+      "repo": "pandas-dev/pandas",
+      "image": "ghcr.io/swefficiency/swefficiency-images:pandas-dev__pandas-44758",
+      "image_compressed_bytes": 2722232543,
+      "pilot": false
+    },
+    {
+      "position": 28,
+      "instance_id": "sympy__sympy-20384",
+      "repo": "sympy/sympy",
+      "image": "ghcr.io/swefficiency/swefficiency-images:sympy__sympy-20384",
+      "image_compressed_bytes": 1508307285,
+      "pilot": false
+    },
+    {
+      "position": 29,
+      "instance_id": "sympy__sympy-23696",
+      "repo": "sympy/sympy",
+      "image": "ghcr.io/swefficiency/swefficiency-images:sympy__sympy-23696",
+      "image_compressed_bytes": 1517253931,
+      "pilot": false
+    },
+    {
+      "position": 30,
+      "instance_id": "pandas-dev__pandas-52525",
+      "repo": "pandas-dev/pandas",
+      "image": "ghcr.io/swefficiency/swefficiency-images:pandas-dev__pandas-52525",
+      "image_compressed_bytes": 2670356874,
+      "pilot": false
+    },
+    {
+      "position": 31,
+      "instance_id": "pandas-dev__pandas-44594",
+      "repo": "pandas-dev/pandas",
+      "image": "ghcr.io/swefficiency/swefficiency-images:pandas-dev__pandas-44594",
+      "image_compressed_bytes": 2721901920,
+      "pilot": false
+    },
+    {
+      "position": 32,
+      "instance_id": "numpy__numpy-19608",
+      "repo": "numpy/numpy",
+      "image": "ghcr.io/swefficiency/swefficiency-images:numpy__numpy-19608",
+      "image_compressed_bytes": 1551598620,
+      "pilot": false
+    },
+    {
+      "position": 33,
+      "instance_id": "pandas-dev__pandas-44827",
+      "repo": "pandas-dev/pandas",
+      "image": "ghcr.io/swefficiency/swefficiency-images:pandas-dev__pandas-44827",
+      "image_compressed_bytes": 2721487740,
+      "pilot": false
+    },
+    {
+      "position": 34,
+      "instance_id": "astropy__astropy-7924",
+      "repo": "astropy/astropy",
+      "image": "ghcr.io/swefficiency/swefficiency-images:astropy__astropy-7924",
+      "image_compressed_bytes": 1504454739,
+      "pilot": false
+    },
+    {
+      "position": 35,
+      "instance_id": "dask__dask-5501",
+      "repo": "dask/dask",
+      "image": "ghcr.io/swefficiency/swefficiency-images:dask__dask-5501",
+      "image_compressed_bytes": 1964364745,
+      "pilot": false
+    },
+    {
+      "position": 36,
+      "instance_id": "astropy__astropy-13898",
+      "repo": "astropy/astropy",
+      "image": "ghcr.io/swefficiency/swefficiency-images:astropy__astropy-13898",
+      "image_compressed_bytes": 1518502801,
+      "pilot": false
+    },
+    {
+      "position": 37,
+      "instance_id": "pydata__xarray-9808",
+      "repo": "pydata/xarray",
+      "image": "ghcr.io/swefficiency/swefficiency-images:pydata__xarray-9808",
+      "image_compressed_bytes": 1775515710,
+      "pilot": false
+    },
+    {
+      "position": 38,
+      "instance_id": "pandas-dev__pandas-55515",
+      "repo": "pandas-dev/pandas",
+      "image": "ghcr.io/swefficiency/swefficiency-images:pandas-dev__pandas-55515",
+      "image_compressed_bytes": 2754348082,
+      "pilot": false
+    },
+    {
+      "position": 39,
+      "instance_id": "pandas-dev__pandas-42486",
+      "repo": "pandas-dev/pandas",
+      "image": "ghcr.io/swefficiency/swefficiency-images:pandas-dev__pandas-42486",
+      "image_compressed_bytes": 2725771907,
+      "pilot": false
+    },
+    {
+      "position": 40,
+      "instance_id": "pandas-dev__pandas-42611",
+      "repo": "pandas-dev/pandas",
+      "image": "ghcr.io/swefficiency/swefficiency-images:pandas-dev__pandas-42611",
+      "image_compressed_bytes": 2725392525,
+      "pilot": false
+    }
+  ]
+}
