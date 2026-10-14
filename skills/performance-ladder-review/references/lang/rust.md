@@ -3,6 +3,7 @@
 Source: The Rust Performance Book (nnethercote.github.io/perf-book), the Rust Book, Rust std docs. Read when the hot path is Rust.
 
 ## Rules
+
 1. **Benchmark with Criterion, in `--release`.** [safe] Debug builds prioritize compile speed; debug benchmarks are meaningless. `cargo bench` uses release by default; `cargo run` does not.
 2. **Set the max-speed build profile.** [safe, config rung] `lto = "fat"`, `codegen-units = 1`, `panic = "abort"`, `target-cpu=native`, consider an alternative allocator. The Performance Book: LTO "can improve runtime speed by 10-20% or more"; codegen-units=1 misses fewer optimizations. (panic="abort" and target-cpu=native are trade-offs: no unwinding; won't run on older CPUs.)
 3. **Prefer iterator chains over manual indexed loops.** [safe] Zero-cost abstraction: "in many cases, Rust code using iterators compiles to the same assembly you'd write by hand" (Rust Book). Iterators also elide the bounds checks that `data[i]` incurs.

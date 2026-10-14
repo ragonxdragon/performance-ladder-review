@@ -1,0 +1,13 @@
+{
+  "config": {
+    "default": true,
+    // Prose and reference tables run long; wrapping them would not help a reader.
+    "MD013": false,
+    // Reference lists keep their numbering across a heading (rules 1-6, then 7-10).
+    "MD029": false,
+    // README uses <picture> so the charts follow the viewer's light or dark theme.
+    "MD033": { "allowed_elements": ["picture", "source", "img"] }
+  },
+  "globs": ["**/*.md"],
+  "ignores": ["node_modules/**"]
+}

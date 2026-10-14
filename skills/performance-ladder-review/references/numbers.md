@@ -5,7 +5,7 @@ Order-of-magnitude anchors for the predict-then-measure step. **These are for es
 ## Latency ladder (approximate, folklore-tier, for mental sanity checks only)
 
 | Operation | ~Time |
-|---|---|
+| --- | --- |
 | L1 cache reference | 0.5-1 ns |
 | Branch mispredict | 3-5 ns |
 | L2 cache reference | 4-7 ns |
@@ -29,7 +29,7 @@ Use: no CPU tuning saves a function making a network call per loop iteration. Th
 These are O-class characterizations or documented sizes, not timing folklore:
 
 | Fact | Value | Source |
-|---|---|---|
+| --- | --- | --- |
 | JVM object header (64-bit, compressed oops) | 12 bytes, padded to 16 (8-byte alignment) | JEP 450/519, Baeldung |
 | JVM object header (64-bit, uncompressed) | 16 bytes | JEP 450 |
 | JVM compact headers (JDK 24/25, JEP 450/519) | 8 bytes | JEP 519 |
@@ -37,7 +37,7 @@ These are O-class characterizations or documented sizes, not timing folklore:
 | JVM megamorphic vs monomorphic dispatch | ~3 ns vs ~1 ns per op | Shipilev, JVM Anatomy Quark #16 |
 | C++ std::vector/string move | O(1): transfers ~3 pointers, regardless of size | ISO C++ / cppreference |
 | C++ std::vector deep copy | O(n): new buffer + per-element copy | ISO C++ |
-| C++ "cheap to copy" threshold | < 3 * sizeof(void*) (~24 B): pass by value; else const ref | Core Guidelines F.16 |
+| C++ "cheap to copy" threshold | `< 3 * sizeof(void*)` (~24 B): pass by value; else const ref | Core Guidelines F.16 |
 | SIMD register widths | 128/256/512-bit = 2/4/8 doubles per instruction | ISA (SSE/AVX2/AVX-512) |
 | Cache-oblivious matrix transpose misses | Theta(1 + mn/B) | Frigo et al., FOCS 1999 |
 | Cache-oblivious FFT/sort misses | Theta(1 + (n/B)(1 + log_M n)) | Frigo et al., FOCS 1999 |

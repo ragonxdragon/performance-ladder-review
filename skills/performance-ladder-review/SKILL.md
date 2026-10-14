@@ -61,6 +61,7 @@ Climb in order; each rung is cheaper, safer, and usually higher-leverage than th
 First ask the **roofline question**: compute-bound or memory-bound? Estimate arithmetic ops per byte touched. Low intensity (elementwise array work, memcpy-like) -> memory-bound -> only locality/fewer-passes/smaller-types/blocking help; SIMD and unrolling won't. High intensity (dense compute kernels) -> compute-side optimizations pay. This tells you which rung to skip. This ladder operationalizes USE (utilization/saturation/errors per resource), RED (rate/errors/duration per service), and Google's four golden signals for a coding agent. Timebox any single investigation; if a rung isn't paying off, move on rather than tunnel.
 
 ### Rung-6 guardrails: which techniques you may apply autonomously
+
 - **Safe by default** (clarity and speed, no downside): eliminate duplicate work; hoist loop-invariant work; right data structure (set/dict membership, generators for streams); stride-1 / struct-of-arrays layout; avoid N+1; fewer allocations in hot loops; short-circuit and order tests by cost; library/platform primitives over hand-rolled; optimizer-friendly code (local accumulators, few opaque calls in loops).
 - **Measurement-gated** (only after a profile names the hotspot, re-measured after): loop unrolling, SIMD/vectorization, cache blocking/tiling, Numba/Cython, memoization/caching (adds invalidation risk), concurrency/parallelism, any algorithmic rewrite that adds complexity.
 - **Never without human sign-off:** lock-free/atomics concurrency, disabling bounds checks or aliasing pragmas or `-ffast-math`, floating-point reassociation that changes results, anything trading measurable correctness for speed on a cold path.
@@ -112,11 +113,13 @@ Re-verify an environment or toolchain claim (a binary looks broken, a build tool
 **Write the comment as a description of the current code, not a narration of the edit.** The `PERF:` marker line is the only place a `before -> after` delta belongs (`query-in-loop -> JOIN`, `1.2s -> 45ms`). The prose around it says what the code does and why it reads that way. A future reader sees only the current code; a sentence about code that no longer exists is dead weight, and it reads as AI slop.
 
 Keep the prose plain:
+
 - No diff narration. Drop `the old X ...`, `previously ...`, `was ... now ...`, `used to ...`, `this replaces ...`, `instead of Y which did Z`, `strictly a win / no behavior change`.
 - No padding or inflation. Skip the rule-of-three list, the `not just X but Y` parallelism, and significance words (`crucial`, `seamless`, `robust`, `leverage`).
 - State it once, in the present tense.
 
 Rewrite each into what the code is:
+
 - Not `the old .into_owned() copied the whole blob`; write `a Cow::Borrowed means the input is unchanged, so no copy`.
 - Not `System::new_all() re-enumerated everything each call`; write `holds only the CPU list and memory, so a poll touches no processes or disks`.
 - Not `byte-identical to the previous json! version`; write `the key order matches what serde_json emits for a Value map`.
@@ -132,6 +135,7 @@ Contrasting with a conceptual alternative is fine (`one probe per workspace, not
 - `/perf-help`: quick reference of the ladder, markers, modes, and commands.
 
 ## Reference files
+
 - `references/measurement.md`: the measurement protocol, predict-measure-diverge, the /perf-loop, tools by ecosystem.
 - `references/numbers.md`: verified structural facts vs flagged folklore anchors.
 - `references/catalogs.md`: domain-organized anti-pattern hunt lists.
