@@ -193,4 +193,4 @@ uv run --no-project --with matplotlib python results/make_charts.py
 
 ## License
 
-[MIT](LICENSE), copyright (c) 2026 Jack Hall.
+[MIT](LICENSE), copyright (c) 2026 John Hall.
