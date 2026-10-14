@@ -157,12 +157,15 @@ def sha256_file(p: Path) -> str:
 # and a workload timing that spans a pause or a battery-throttled CPU is not comparable.
 
 SUSPEND_TOLERANCE_SEC = 60
+# ES_CONTINUOUS | ES_SYSTEM_REQUIRED. PowerShell reads the literal 0x80000001 as a negative
+# Int32, which the UInt32 parameter rejects, so the value is cast from its decimal form.
 KEEP_AWAKE_PS = (
     "Add-Type -Namespace PlrBench -Name Power -MemberDefinition "
     "'[DllImport(\"kernel32.dll\")] public static extern uint SetThreadExecutionState(uint f);'; "
-    "[PlrBench.Power]::SetThreadExecutionState(0x80000001) | Out-Null; "
+    "if ([PlrBench.Power]::SetThreadExecutionState([uint32]2147483649) -eq 0) { exit 1 }; "
     "while ($true) { Start-Sleep -Seconds 30 }"
 )
+_keep_awake: subprocess.Popen | None = None
 
 
 def powershell() -> str | None:
@@ -186,7 +189,8 @@ def on_battery() -> bool | None:
 
 
 def wait_for_ac(study: Study) -> None:
-    """Agent runs and timing runs only start on AC power."""
+    """Agent runs and timing runs only start on AC power, with the keep-awake helper running."""
+    start_keep_awake()
     if not on_battery():
         return
     log("host is on battery; waiting for AC power before the next step")
@@ -200,15 +204,27 @@ def wait_for_ac(study: Study) -> None:
 
 
 def start_keep_awake() -> subprocess.Popen | None:
-    """Ask Windows not to sleep while the study runs. Lid-close and critical-battery sleep still win."""
+    """Ask Windows not to sleep while the study runs. Lid-close and critical-battery sleep still win.
+
+    Called before every step; it starts the helper, or restarts it if it has exited.
+    """
+    global _keep_awake
+    if _keep_awake is not None and _keep_awake.poll() is None:
+        return _keep_awake
     ps = powershell()
     if not ps:
         return None
+    if _keep_awake is not None:
+        log(f"keep-awake helper exited with {_keep_awake.returncode}; restarting it")
     proc = subprocess.Popen([ps, "-NoProfile", "-Command", KEEP_AWAKE_PS],
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    time.sleep(5)
+    if proc.poll() is not None:
+        log(f"WARNING: keep-awake helper failed (exit {proc.returncode}); Windows may sleep during the study")
     import atexit
 
     atexit.register(proc.terminate)
+    _keep_awake = proc
     return proc
 
 
