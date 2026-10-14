@@ -611,7 +611,7 @@ def render_prompt(row: dict) -> str:
     """Render the official SWE-fficiency instruction template, unchanged.
 
     The official spec leaves workspace_dir_name unset, which renders /testbed/repo even
-    though the repository is checked out at /testbed. We pass the empty string so the
+    though the repository is checked out at /testbed. It is set to the empty string so the
     <uploaded_files> path points at the real checkout (/testbed/). Both arms get the
     identical text.
     """
@@ -641,8 +641,8 @@ def sync_refreshed_credentials(container: str, sent_hash: str, cred_src: Path) -
     """If the CLI refreshed its OAuth token during the run, carry the new token home.
 
     Refresh tokens rotate on use, so a refreshed copy left inside a deleted container
-    would leave the owner's own file holding a dead refresh token. The write-back only
-    happens when the owner's file is unchanged since we copied it (compare-and-swap).
+    would leave the source file holding a dead refresh token. The write-back only
+    happens when the source file is unchanged since the copy was made (compare-and-swap).
     """
     tmpdir = Path(tempfile.mkdtemp(prefix="plr-cred-", dir=WORKDIR / "tmp"))
     try:
@@ -657,7 +657,7 @@ def sync_refreshed_credentials(container: str, sent_hash: str, cred_src: Path) -
         except json.JSONDecodeError:
             return "refreshed-but-unreadable"
         if sha256_file(cred_src) != sent_hash:
-            return "refreshed-but-owner-file-changed"
+            return "refreshed-but-source-changed"
         shutil.copyfile(got, cred_src.with_name(cred_src.name + ".plr-tmp"))
         os.replace(cred_src.with_name(cred_src.name + ".plr-tmp"), cred_src)
         return "refreshed-written-back"
@@ -912,7 +912,7 @@ def cmd_run(args) -> None:
                     if meta["outcome"] == "auth_error":
                         s["status"] = "auth_error"
                         study.save()
-                        sys.exit(f"{iid}: authentication failed; the owner must sign in again (see README). "
+                        sys.exit(f"{iid}: authentication failed; sign in to Claude Code again (see README). "
                                  f"Rerun the same command afterwards to resume.")
                     if meta["outcome"] == "rate_limited":
                         s.setdefault("limit_hits", []).append({"at": now_iso(), "reset_at": meta.get("reset_at")})
