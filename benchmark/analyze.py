@@ -40,6 +40,8 @@ def load_runs(path: Path) -> list[dict]:
 
 
 def logsr(r: dict) -> float | None:
+    if r.get("unscorable"):
+        return None
     v = r.get("speedup_vs_expert")
     if v is None or isinstance(v, str):
         return None
@@ -84,14 +86,15 @@ def fmt(x, nd=3):
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("runs", type=Path, help="runs.jsonl from the study directory")
+    ap.add_argument("runs", type=Path, nargs="+", help="runs.jsonl from one or more study directories")
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--label", default=None, help="label for the report, e.g. PILOT")
     args = ap.parse_args()
 
-    runs = load_runs(args.runs)
-    study = runs[0]["study"] if runs else "unknown"
-    label = args.label or ("PILOT" if "pilot" in study else "")
+    runs = [r for path in args.runs for r in load_runs(path)]
+    studies = sorted({r["study"] for r in runs})
+    study = " + ".join(studies) if studies else "unknown"
+    label = args.label or ("PILOT" if studies and all("pilot" in s for s in studies) else "")
     args.out.mkdir(parents=True, exist_ok=True)
 
     # Per-run table.
@@ -110,7 +113,7 @@ def main() -> None:
 
     task_rows = []
     for iid in sorted(by, key=lambda i: min(r["position"] or 0 for a in by[i].values() for r in a)):
-        row = {"instance_id": iid}
+        row = {"instance_id": iid, "unscorable": next((r.get("unscorable") for a in by[iid].values() for r in a), None)}
         for arm in ARMS:
             ls = [logsr(r) for r in by[iid].get(arm, []) if logsr(r) is not None]
             row[f"{arm}_runs"] = len(ls)
@@ -177,8 +180,13 @@ def main() -> None:
 
     arm_runs = {a: [r for r in runs if r["arm"] == a] for a in ARMS}
     add("runs", len(arm_runs["baseline"]), len(arm_runs["skill"]), None, None, None, None, "agent runs completed")
-    add("correct_rate", rate([r.get("correct") == 1.0 for r in arm_runs["baseline"]]),
-        rate([r.get("correct") == 1.0 for r in arm_runs["skill"]]), None, None, None, None, "per run")
+    scorable = {a: [r for r in arm_runs[a] if not r.get("unscorable")] for a in ARMS}
+    add("correct_rate", rate([r.get("correct") == 1.0 for r in scorable["baseline"]]),
+        rate([r.get("correct") == 1.0 for r in scorable["skill"]]), None, None, None, None,
+        "official verdict, per scorable run")
+    add("correct_rate_host_adjusted", rate([r.get("correct_host_adjusted") for r in scorable["baseline"]]),
+        rate([r.get("correct_host_adjusted") for r in scorable["skill"]]), None, None, None, None,
+        "ignores tests that also fail for the expert patch on this host")
     for key in ("input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens",
                 "num_turns", "wall_sec", "tool_calls", "total_cost_usd_equiv"):
         b = [r.get(key) for r in arm_runs["baseline"]]
@@ -199,24 +207,34 @@ def main() -> None:
     # Markdown report.
     title = f"# SWE-fficiency A/B: performance-ladder-review ({label + ', ' if label else ''}study `{study}`)"
     lines = [title, ""]
+    if len(studies) > 1:
+        lines += [f"This view combines {len(studies)} studies ({', '.join(studies)}). They may use different "
+                  "skill versions and different tasks; read the per-study reports first.", ""]
     if label:
         lines += [f"**{label} numbers.** {len(paired)} paired task(s). These numbers show the harness works; "
                   "they are not evidence for or against the skill.", ""]
     lines += ["## Per run", "",
-              "| Task | Arm | Run | Outcome | Correct | Speedup | Expert speedup | Speedup vs expert | Turns | Wall (s) "
-              "| Output tokens | Skill fired | Timed before first edit |",
-              "| --- | --- | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |"]
+              "| Study | Task | Arm | Run | Outcome | Correct (official) | Correct (host-adjusted) | Raw speedup "
+              "| Expert speedup | Speedup vs expert | Turns | Wall (s) | CLI (s) | Output tokens | Skill fired "
+              "| Timed before first edit |",
+              "| --- | --- | --- | ---: | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |"]
     for r in runs:
+        if r.get("unscorable"):
+            score_cells = "not scorable | not scorable | n/a | n/a | n/a"
+        else:
+            score_cells = (f"{fmt(r.get('correct'), 0)} | {fmt(r.get('correct_host_adjusted'))} | "
+                           f"{fmt(r.get('raw_speedup'))} | {fmt(r.get('gold_speedup'))} | "
+                           f"{fmt(r.get('speedup_vs_expert'))}")
+        cli = r["duration_ms"] / 1000 if r.get("duration_ms") else None
         lines.append(
-            f"| {r['instance_id']} | {r['arm']} | {r['run']} | {r['outcome']} | {fmt(r.get('correct'), 0)} | "
-            f"{fmt(r.get('speedup'))} | {fmt(r.get('gold_speedup'))} | {fmt(r.get('speedup_vs_expert'))} | "
-            f"{fmt(r.get('num_turns'))} | {fmt(r.get('wall_sec'), 0)} | {fmt(r.get('output_tokens'))} | "
-            f"{r.get('skill_fired')} | {r.get('timing_before_first_edit')} |")
+            f"| {r['study']} | {r['instance_id']} | {r['arm']} | {r['run']} | {r['outcome']} | {score_cells} | "
+            f"{fmt(r.get('num_turns'))} | {fmt(r.get('wall_sec'), 0)} | {fmt(cli, 0)} | "
+            f"{fmt(r.get('output_tokens'))} | {r.get('skill_fired')} | {r.get('timing_before_first_edit')} |")
     lines += ["", "## Paired by task", "",
               "| Task | Baseline SR | Skill SR | Skill / baseline | Result |", "| --- | ---: | ---: | ---: | --- |"]
     for r in task_rows:
         lines.append(f"| {r['instance_id']} | {fmt(r.get('baseline_sr'))} | {fmt(r.get('skill_sr'))} | "
-                     f"{fmt(r.get('sr_ratio'))} | {r.get('result', 'unpaired')} |")
+                     f"{fmt(r.get('sr_ratio'))} | {'not scorable' if r.get('unscorable') else r.get('result', 'unpaired')} |")
     lines += ["", "## Aggregates", "", "| Metric | Baseline | Skill | Skill minus baseline | 95% CI | n |",
               "| --- | ---: | ---: | ---: | --- | ---: |"]
     for s in summary:
@@ -226,13 +244,21 @@ def main() -> None:
     lines += ["", "## Notes", "",
               "- SR is the official speedup ratio versus the expert patch. Failed correctness counts as no speedup.",
               "- Per-task values are geometric means over runs. Ties are within 5 percent.",
+              "- Host-adjusted correctness ignores required tests that also fail under the expert patch on this "
+              "host. It is a diagnostic; the official verdict drives the score.",
+              "- Wall time includes any time the host spent asleep; CLI time is the CLI's own duration and "
+              "excludes it.",
               f"- Bootstrap: {BOOT_N} resamples of tasks with replacement, seed {BOOT_SEED}; no CI is reported with fewer than {MIN_BOOT_TASKS} paired tasks.",
               "- Token counts come from the CLI result event and cover the whole run.",
               "- 'Timed before first edit' is a transcript heuristic: a Bash call that runs timing or profiling code "
               "before the first edit to a tracked repository file.",
               ]
-    if unscored:
-        lines.append(f"- {len(unscored)} run(s) had no official score and are left out of the speedup statistics.")
+    unscorable = sorted({(r["instance_id"], r["unscorable"]) for r in runs if r.get("unscorable")})
+    for iid, why in unscorable:
+        lines.append(f"- {iid} is not scorable: {why}. Its runs are left out of the speedup statistics.")
+    other = [r for r in unscored if not r.get("unscorable")]
+    if other:
+        lines.append(f"- {len(other)} run(s) had no official score and are left out of the speedup statistics.")
     (args.out / "ab_report.md").write_text("\n".join(lines) + "\n")
     print(f"wrote {args.out}")
 
