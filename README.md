@@ -144,11 +144,11 @@ per config callback (3.2 KB to 0), and CI cache restore time per job (17-19 s to
 | Project | Perf commits | Measured changes | Estimated changes | Perf commits with no number |
 | --------- | -------------: | -----------------: | ------------------: | ----------------------------: |
 | firmware | 63 | 17 | 29 | 22 |
-| desktop app | 41 | 2 | 0 | 39 |
+| desktop app | 41 | 2 | 3 | 36 |
 | twinflow | 2 | 3 | 0 | 0 |
 
 Measured points are few outside the firmware: 22 measured changes in all, 16 of them charted.
-The full dataset is [`results/results.csv`](results/results.csv) (79 rows) with per-project counts
+The full dataset is [`results/results.csv`](results/results.csv) (82 rows) with per-project counts
 in [`results/summary.csv`](results/summary.csv).
 
 ### How the data was gathered, and its limits
