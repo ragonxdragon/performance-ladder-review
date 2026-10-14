@@ -951,6 +951,72 @@ def _num(v: str):
         return v
 
 
+# --------------------------------------------------------------- gold gate
+#
+# A task is only worth agent time if the scorer can measure it here: the expert patch
+# must produce a timing, show a speedup above the noise floor, and pass every required
+# test on this host. Otherwise both arms get the same non-result.
+
+GATE_MIN_SPEEDUP = 1.2
+
+
+def gold_gate(study: Study, iid: str, row: dict) -> dict:
+    gold_dir = study.dir / "scoring" / "logs" / "run_evaluation" / study.name / "gold" / iid
+    perf = gold_dir / "perf_summary.txt"
+    if not perf.exists():
+        pre = gold_dir / "perf_output_preedit.txt"
+        killed = pre.exists() and "Killed" in pre.read_text(errors="replace")
+        return {"pass": False, "reason": "workload killed (out of memory)" if killed else "no expert timing"}
+    vals = [float(line.split(":", 1)[1]) for line in perf.read_text().splitlines()[:4]]
+    before, before_sd, after, after_sd = vals
+    speedup = before / after
+    out = {"before_mean": before, "before_sd": before_sd, "after_mean": after, "after_sd": after_sd,
+           "gold_speedup": round(speedup, 4), "min_speedup": GATE_MIN_SPEEDUP}
+    status_f = gold_dir / "covering_test_status.json"
+    status = json.loads(status_f.read_text()) if status_f.exists() else {}
+    failing = [t for t in _p2p(row) if "PASS" not in status.get(t, "")]
+    out["gold_failing_required_tests"] = failing
+    if speedup < GATE_MIN_SPEEDUP:
+        out.update({"pass": False, "reason": f"expert speedup {speedup:.2f}x is below {GATE_MIN_SPEEDUP}x here"})
+    elif failing:
+        out.update({"pass": False, "reason": f"expert patch fails {len(failing)} required test(s) here"})
+    else:
+        out["pass"] = True
+    return out
+
+
+def score_with_retries(study: Study, cfg: dict, iid: str, model: str, patch: Path | None) -> dict:
+    """Score one prediction set; redo a timing run that spans a host pause or ends on battery."""
+    s = study.step(iid, f"score:{model}")
+    for attempt in range(1, 4):
+        wait_for_ac(study)
+        s.update(status="running", attempts=attempt)
+        study.save()
+        log(f"{iid}: scoring {model} (attempt {attempt})")
+        res = score(study, cfg, iid, model, patch)
+        s.update(res)
+        if res["host_suspended_sec"] <= SUSPEND_TOLERANCE_SEC and not res["on_battery_after"]:
+            break
+        s.setdefault("discarded", []).append({"at": now_iso(), "host_suspended_sec": res["host_suspended_sec"],
+                                              "on_battery_after": res["on_battery_after"]})
+        log(f"{iid}: {model} timing spanned a host pause or battery power; scoring again")
+    s["status"] = "done" if res["eval_exit_code"] == 0 else "error"
+    s["at"] = now_iso()
+    study.save()
+    if res["eval_exit_code"] != 0:
+        sys.exit(f"{iid}: official eval failed for {model}; see {study.dir / 'scoring'}")
+    return res
+
+
+def cleanup_task(study: Study, iid: str) -> None:
+    s = study.step(iid, "cleanup")
+    s["disk_before"] = disk_snapshot()
+    remove_task_images(iid)
+    docker("container", "prune", "-f", "--filter", "label=plr.role=agent", check=False)
+    s.update(status="done", disk_after=disk_snapshot(), at=now_iso())
+    study.save()
+
+
 # --------------------------------------------------------------------- run
 
 
@@ -965,7 +1031,8 @@ def cmd_run(args) -> None:
     if args.tasks:
         tasks = tasks[: args.tasks]
     if args.only:
-        tasks = [t for t in tasks if t["instance_id"] in args.only]
+        by_id = {t["instance_id"]: t for t in tasks}
+        tasks = [by_id[i] for i in args.only if i in by_id]  # keep the given order (candidate order)
 
     study = Study(args.study)
     study.lock()
@@ -989,8 +1056,14 @@ def cmd_run(args) -> None:
     rows = load_dataset_rows(tasks_doc["method"]["dataset_revision"])
     start_keep_awake()
 
+    def accepted() -> int:
+        return sum(1 for x in (study.state.get("tasks") or {}).values()
+                   if (x.get("gold_gate") or {}).get("pass") or (not args.gold_gate and x.get("complete")))
+
     for t in tasks:
         iid = t["instance_id"]
+        if args.need and accepted() >= args.need and not study.state.get("tasks", {}).get(iid, {}).get("gold_gate"):
+            break
         st = study.task(iid)
         if st.get("complete"):
             log(f"{iid}: complete, skipping")
@@ -1018,6 +1091,22 @@ def cmd_run(args) -> None:
                                            disk_after=disk_snapshot(), at=now_iso())
             study.save()
         docker("tag", image, eval_tag(iid))  # keeps the scorer from deleting and re-pulling between evals
+
+        # 1b. gold gate: score the expert patch first and drop tasks this host cannot measure
+        if args.gold_gate:
+            if not study.done(iid, "score:gold"):
+                score_with_retries(study, cfg, iid, "gold", None)
+            if "gold_gate" not in st:
+                st["gold_gate"] = gold_gate(study, iid, row)
+                study.save()
+            if not st["gold_gate"]["pass"]:
+                st["rejected"] = st["gold_gate"]["reason"]
+                log(f"{iid}: rejected by the gold gate ({st['rejected']}); swapping to the next candidate")
+                cleanup_task(study, iid)
+                st["complete"] = True
+                study.save()
+                continue
+            log(f"{iid}: gold gate passed (expert speedup {st['gold_gate']['gold_speedup']}x)")
 
         # 2. agent runs
         for k in range(1, args.runs + 1):
@@ -1066,25 +1155,7 @@ def cmd_run(args) -> None:
             key = f"score:{model}"
             if study.done(iid, key) or st.get("unscorable"):
                 continue
-            s = study.step(iid, key)
-            for attempt in range(1, 4):
-                wait_for_ac(study)
-                s.update(status="running", attempts=attempt)
-                study.save()
-                log(f"{iid}: scoring {model} (attempt {attempt})")
-                res = score(study, cfg, iid, model, patch)
-                s.update(res)
-                # A timing run that spans a host pause or ends on battery is not comparable; redo it.
-                if res["host_suspended_sec"] <= SUSPEND_TOLERANCE_SEC and not res["on_battery_after"]:
-                    break
-                s.setdefault("discarded", []).append({"at": now_iso(), "host_suspended_sec": res["host_suspended_sec"],
-                                                      "on_battery_after": res["on_battery_after"]})
-                log(f"{iid}: {model} timing spanned a host pause or battery power; scoring again")
-            s["status"] = "done" if res["eval_exit_code"] == 0 else "error"
-            s["at"] = now_iso()
-            study.save()
-            if res["eval_exit_code"] != 0:
-                sys.exit(f"{iid}: official eval failed for {model}; see {study.dir / 'scoring'}")
+            res = score_with_retries(study, cfg, iid, model, patch)
             if model == "gold" and not res["perf_summary"]:
                 reason = ("the workload was killed (out of memory) on this host" if res.get("workload_killed")
                           else "the expert patch produced no timing on this host")
@@ -1103,11 +1174,7 @@ def cmd_run(args) -> None:
             study.save()
 
         # 4. cleanup
-        s = study.step(iid, "cleanup")
-        s["disk_before"] = disk_snapshot()
-        remove_task_images(iid)
-        docker("container", "prune", "-f", "--filter", "label=plr.role=agent", check=False)
-        s.update(status="done", disk_after=disk_snapshot(), at=now_iso())
+        cleanup_task(study, iid)
         st["complete"] = True
         study.save()
         export_runs(study)
@@ -1272,7 +1339,10 @@ def main() -> None:
     p = sub.add_parser("run")
     p.add_argument("--study", required=True, help="study name, e.g. pilot or full")
     p.add_argument("--tasks", type=int, help="use the first N tasks of tasks.json")
-    p.add_argument("--only", nargs="*", help="restrict to these instance ids")
+    p.add_argument("--only", nargs="*", help="restrict to these instance ids, in this order")
+    p.add_argument("--gold-gate", action="store_true",
+                   help="score the expert patch first and skip tasks this host cannot measure")
+    p.add_argument("--need", type=int, help="stop after this many tasks are accepted (with --gold-gate)")
     p.add_argument("--runs", type=int, default=1, help="runs per arm per task")
     p.add_argument("--model", default=DEFAULTS["model"])
     p.add_argument("--cli-version", default=DEFAULTS["cli_version"])
