@@ -190,6 +190,51 @@ Regenerate the charts with:
 uv run --no-project --with matplotlib python results/make_charts.py
 ```
 
+## Independent A/B pilot
+
+A controlled pilot on [SWE-fficiency](https://github.com/swefficiency/swefficiency), a public
+benchmark of performance work in real Python repositories. Each task gives the agent a repository
+and a slow workload; the official harness checks that the repository's tests still pass and times
+the workload against the expert patch.
+
+**What was run (2026-10-14):**
+
+- Tasks: `sympy__sympy-12640` and `astropy__astropy-6941`. They are the two smallest images in a
+  40-task sample drawn with a fixed seed from the 411 instances that a reliability audit
+  ([arXiv 2607.01211](https://arxiv.org/abs/2607.01211)) found stable across machines.
+- Two arms, one run each per task. Same model (`claude-sonnet-5-5`), Claude Code CLI 2.1.238,
+  official SWE-fficiency prompt, and instance container in both. The skill arm differs only in
+  having `skills/performance-ladder-review/` installed.
+- Caps: 100 turns and 60 minutes per run. Each run used a fresh config directory with only the
+  credentials file and, for the skill arm, the skill. It had no CLAUDE.md, hooks, plugins, MCP
+  servers, or other skills (the CLI's bundled skills were switched off in both arms).
+- Scoring: the official SWE-fficiency harness, run after the agent runs finished, on the same four
+  pinned CPU threads, on a laptop (i9-11900H, WSL2).
+
+**Per-run results.** "Speedup" is the workload speedup the harness measured for the agent's patch;
+"vs expert" is that speedup divided by the expert patch's speedup (the benchmark's score, where
+above 1 beats the expert). Tokens are the CLI's totals for the run.
+
+| Task | Arm | Tests pass | Speedup | Expert speedup | vs expert | Output tokens | Input / cache write / cache read tokens | Turns | Wall time | Skill fired | Profiled before first edit |
+| --- | --- | --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | --- | --- |
+| sympy-12640 | baseline | yes | 5.27x | 1.79x | 2.94 | 2,648 | 18 / 55,037 / 321,591 | 9 | 92 s | no | yes |
+| sympy-12640 | skill | yes | 3.76x | 1.79x | 2.09 | 3,714 | 20 / 40,643 / 443,276 | 12 | 130 s | yes | yes |
+| astropy-6941 | baseline | yes | 9.10x | 26.28x | 0.35 | 7,124 | 26 / 45,031 / 612,271 | 15 | 102 s | no | yes |
+| astropy-6941 | skill | yes | 1.94x | 26.28x | 0.07 | 3,869 | 20 / 42,349 / 455,564 | 11 | 122 s | yes | yes |
+
+All four runs finished on their own, well inside the caps, with no limit errors or retries. In
+these two tasks the baseline arm scored higher than the skill arm on both. Both arms ran a profiler
+before their first edit in every run, and the skill fired as the first tool call in both skill
+runs.
+
+**Caveats.** Two tasks with one run per arm cannot establish a difference, in either direction, and
+no significance claim is made. Agent runs vary from run to run, and two small tasks say little
+about the other 400. Laptop timing is noisier than the benchmark's reference cloud machines. This
+pilot shows the method works end to end, and it can be reproduced or extended with
+[`benchmark/run.py`](benchmark/run.py); the method, fairness controls and deviations from the
+official setup are in [`benchmark/README.md`](benchmark/README.md). Full outputs, including the
+four patches, are in [`benchmark/results/pilot/`](benchmark/results/pilot/).
+
 ## Repository layout
 
 | Path | Contents |
@@ -198,6 +243,7 @@ uv run --no-project --with matplotlib python results/make_charts.py
 | `results/results.csv` | one row per measured or estimated metric |
 | `results/summary.csv` | per-project commit and marker counts |
 | `results/make_charts.py` | renders the light and dark SVGs in `results/charts/` |
+| `benchmark/` | the SWE-fficiency A/B harness, its task list, and the pilot results |
 
 ## License
 
