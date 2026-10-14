@@ -1,0 +1,27 @@
+diff --git a/astropy/coordinates/baseframe.py b/astropy/coordinates/baseframe.py
+index 48339769d..1c9b98d8c 100644
+--- a/astropy/coordinates/baseframe.py
++++ b/astropy/coordinates/baseframe.py
+@@ -556,6 +556,14 @@ class BaseCoordinateFrame(ShapedLikeNDArray, metaclass=FrameMeta):
+         # without units, which are deprecated and will be removed.  This can be
+         # moved into the representation_info property at that time.
+ 
++        # The result depends only on the registered representation classes and
++        # on this frame class, so it is cached on the class and rebuilt when a
++        # representation or differential class is registered.
++        key = (len(r.REPRESENTATION_CLASSES), len(r.DIFFERENTIAL_CLASSES))
++        cached = cls.__dict__.get('_representation_info_cache')
++        if cached is not None and cached[0] == key:
++            return cached[1]
++
+         repr_attrs = {}
+         for repr_diff_cls in (list(r.REPRESENTATION_CLASSES.values()) +
+                               list(r.DIFFERENTIAL_CLASSES.values())):
+@@ -597,6 +605,7 @@ class BaseCoordinateFrame(ShapedLikeNDArray, metaclass=FrameMeta):
+             repr_attrs[repr_diff_cls]['names'] = tuple(nms)
+             repr_attrs[repr_diff_cls]['units'] = tuple(uns)
+ 
++        cls._representation_info_cache = (key, repr_attrs)
+         return repr_attrs
+ 
+     @property

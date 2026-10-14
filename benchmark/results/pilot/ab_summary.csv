@@ -1,0 +1,28 @@
+metric,baseline,skill,diff_skill_minus_baseline,ci95_low,ci95_high,n,note
+mean_log_speedup_vs_expert,0.008975383638695322,-0.9323241645584095,-0.9412995481971049,,,2,"per-task mean of log SR over runs, then mean over tasks; CI = paired bootstrap over tasks"
+geometric_mean_speedup_vs_expert,1.0090157831710704,0.3936377674349291,0.3901205253676305,,,2,diff column is the skill/baseline ratio
+mean_paired_speedup_difference,1.6424485163079539,1.083929044444962,-0.5585194718629919,,,2,per-task SR (geometric mean over runs); diff = mean over tasks of skill SR minus baseline SR
+median_speedup_vs_expert,1.6424485163079539,1.083929044444962,-0.5585194718629919,,,2,diff column is the median of the per-task differences
+harmonic_mean_speedup_vs_expert,0.6198750466632196,0.14295280004282895,-0.4769222466203906,,,2,the official SWE-fficiency aggregate (floor 0.001)
+win_tie_loss,,,0/0/2,,,2,skill vs baseline per task; tie = within 5 percent
+runs,2,2,,,,,agent runs completed
+correct_rate,1.0,1.0,,,,,per run
+mean_input_tokens,22.0,20.0,-2.0,,,,per run
+median_input_tokens,22.0,20.0,,,,,per run
+mean_output_tokens,4886.0,3791.5,-1094.5,,,,per run
+median_output_tokens,4886.0,3791.5,,,,,per run
+mean_cache_creation_input_tokens,50034.0,41496.0,-8538.0,,,,per run
+median_cache_creation_input_tokens,50034.0,41496.0,,,,,per run
+mean_cache_read_input_tokens,466931.0,449420.0,-17511.0,,,,per run
+median_cache_read_input_tokens,466931.0,449420.0,,,,,per run
+mean_num_turns,12.0,11.5,-0.5,,,,per run
+median_num_turns,12.0,11.5,,,,,per run
+mean_wall_sec,96.7,126.35,29.64999999999999,,,,per run
+median_wall_sec,96.7,126.35,,,,,per run
+mean_tool_calls,11.0,9.5,-1.5,,,,per run
+median_tool_calls,11.0,9.5,,,,,per run
+mean_total_cost_usd_equiv,0.5136392999999999,0.4407345,-0.07290479999999994,,,,per run
+median_total_cost_usd_equiv,0.5136392999999999,0.4407345,,,,,per run
+rate_skill_fired,0.0,1.0,,,,,per run
+rate_timing_before_first_edit,1.0,1.0,,,,,per run
+rate_profiler_before_first_edit,1.0,1.0,,,,,per run

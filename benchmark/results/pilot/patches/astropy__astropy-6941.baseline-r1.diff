@@ -1,0 +1,54 @@
+diff --git a/astropy/coordinates/baseframe.py b/astropy/coordinates/baseframe.py
+index 48339769d..b38e085e3 100644
+--- a/astropy/coordinates/baseframe.py
++++ b/astropy/coordinates/baseframe.py
+@@ -556,6 +556,12 @@ class BaseCoordinateFrame(ShapedLikeNDArray, metaclass=FrameMeta):
+         # without units, which are deprecated and will be removed.  This can be
+         # moved into the representation_info property at that time.
+ 
++        key = (tuple(r.REPRESENTATION_CLASSES.values()),
++               tuple(r.DIFFERENTIAL_CLASSES.values()))
++        cached = cls.__dict__.get('_representation_info_cache')
++        if cached is not None and cached[0] == key:
++            return cached[1]
++
+         repr_attrs = {}
+         for repr_diff_cls in (list(r.REPRESENTATION_CLASSES.values()) +
+                               list(r.DIFFERENTIAL_CLASSES.values())):
+@@ -597,6 +603,7 @@ class BaseCoordinateFrame(ShapedLikeNDArray, metaclass=FrameMeta):
+             repr_attrs[repr_diff_cls]['names'] = tuple(nms)
+             repr_attrs[repr_diff_cls]['units'] = tuple(uns)
+ 
++        cls._representation_info_cache = (key, repr_attrs)
+         return repr_attrs
+ 
+     @property
+diff --git a/astropy/coordinates/sky_coordinate.py b/astropy/coordinates/sky_coordinate.py
+index 3e1e1910f..f1e41521a 100644
+--- a/astropy/coordinates/sky_coordinate.py
++++ b/astropy/coordinates/sky_coordinate.py
+@@ -285,7 +285,23 @@ class SkyCoord(ShapedLikeNDArray):
+             # First turn `self` into a mockup of the thing we want - we can copy
+             # this to get all the right attributes
+             self._sky_coord_frame = self_frame._apply(method, *args, **kwargs)
+-            out = SkyCoord(self, representation=self.representation, copy=False)
++            new_frame = self._sky_coord_frame
++            data = new_frame.data
++            representation = new_frame.representation
++            if (not data.differentials and
++                    (type(data) is representation or
++                     (type(data) is UnitSphericalRepresentation and
++                      representation is SphericalRepresentation))):
++                # Data already in the right representation: skip re-parsing.
++                out = SkyCoord.__new__(SkyCoord)
++                out.__dict__['_sky_coord_frame'] = new_frame
++                out.__dict__['_extra_frameattr_names'] = {
++                    attr for attr in self._extra_frameattr_names
++                    if getattr(self, attr) is not None}
++                new_frame._attr_names_with_defaults = []
++            else:
++                out = SkyCoord(self, representation=self.representation,
++                               copy=False)
+             for attr in self._extra_frameattr_names:
+                 value = getattr(self, attr)
+                 if getattr(value, 'size', 1) > 1:
