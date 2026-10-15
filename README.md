@@ -197,7 +197,7 @@ benchmark of performance work in real Python repositories. Each task gives the a
 and a slow workload; the official harness checks that the repository's tests still pass and times
 the workload against the expert patch.
 
-**Setup (both rounds, 2026-10-14):**
+**Setup (all rounds, 2026-10-14 and 2026-10-15):**
 
 - Tasks come from a 40-task sample drawn with a fixed seed from the 411 instances that a
   reliability audit ([arXiv 2607.01211](https://arxiv.org/abs/2607.01211)) found stable across
@@ -269,16 +269,60 @@ Round 2 shows the revised behavior but gives no usable score comparison:
   hotspots against the baseline's two.
 - **The 4,261-second run** did not break the 60-minute cap in running time. The laptop was in
   standby or asleep for about 2,390 s of it, and the cap counted running time only. The runner now
-  also enforces the cap on wall time, waits for AC power, holds a keep-awake request, and rescores
-  any timing run that spans a pause.
+  also enforces the cap on wall time, waits for AC power, holds a keep-awake request (working from
+  round 3 on), and rescores any timing run that spans a pause.
+
+### Round 3: revised skill, new tasks, two runs per arm
+
+Tasks: `sympy__sympy-20384` and `astropy__astropy-7924`, the two smallest unused images. Before any
+agent time, the runner scored the expert patch on each and accepted the task only if it timed,
+showed at least 1.2x, and passed every required test on this machine. Both passed (expert speedups
+72.68x and 8.82x), so no replacement was needed. All runs here pass the official correctness
+check, and no scoring run spanned a pause or battery power.
+
+| Task | Arm | Run | Speedup | Expert speedup | vs expert | Output tokens | Other tokens | Turns | Wall time | Skill fired | Profiled before first edit |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | --- | --- |
+| sympy-20384 | baseline | 1 | 107.27x | 72.68x | 1.48 | 2,218 | 8 / 27,693 / 124,435 | 5 | 122 s | no | yes |
+| sympy-20384 | baseline | 2 | 129.95x | 72.68x | 1.79 | 1,451 | 10 / 12,738 / 176,934 | 5 | 69 s | no | yes |
+| sympy-20384 | skill | 1 | 448.51x | 72.68x | 6.17 | 7,656 | 42 / 60,689 / 1,262,033 | 23 | 214 s | yes | yes |
+| sympy-20384 | skill | 2 | 139.25x | 72.68x | 1.92 | 2,497 | 12 / 23,134 / 249,750 | 8 | 128 s | yes | yes |
+| astropy-7924 | baseline | 1 | 4.61x | 8.82x | 0.52 | 2,253 | 14 / 27,492 / 245,325 | 7 | 141 s | no | yes |
+| astropy-7924 | baseline | 2 | 5.10x | 8.82x | 0.58 | 2,023 | 14 / 13,764 / 257,667 | 7 | 96 s | no | yes |
+| astropy-7924 | skill | 1 | 6.01x | 8.82x | 0.68 | 5,937 | 46 / 90,329 / 1,127,439 | 25 | 131 s | yes | yes |
+| astropy-7924 | skill | 2 | 3.55x | 8.82x | 0.40 | 3,569 | 16 / 28,104 / 349,384 | 10 | 124 s | yes | yes |
+
+Averaged over its two runs, the skill arm scored higher on sympy-20384 (3.44 against 1.62 times
+the expert) and about the same on astropy-7924 (0.52 against 0.55). Every run on a task found the
+same first fix. The sympy gap comes from one skill run that re-profiled after that fix, found
+`PolyElement.str` holding about 97 percent of the remaining time, and fixed it too; the other
+skill run stopped after the first fix. The revised skill also cost more: 16.5 turns against 6 and
+4,915 output tokens against 1,986 per run on average.
+
+### Across all rounds
+
+| Round | Skill | Task | Runs per arm | Baseline vs expert | Skill vs expert | Result |
+| --- | --- | --- | ---: | ---: | ---: | --- |
+| 1 | original | sympy-12640 | 1 | 2.94 | 2.09 | baseline higher |
+| 1 | original | astropy-6941 | 1 | 0.35 | 0.07 | baseline higher |
+| 2 | revised | numpy-19608 | 1 | 0.996 | 0.996 | no usable score |
+| 2 | revised | xarray-9808 | 1 | not scorable | not scorable | no usable score |
+| 3 | revised | sympy-20384 | 2 | 1.62 | 3.44 | skill higher |
+| 3 | revised | astropy-7924 | 2 | 0.55 | 0.52 | about the same |
+
+The original skill scored lower on both of its scored tasks. The revised skill scored higher on one
+and about the same on the other. In three of its four round 3 runs it re-profiled after the first
+fix and then either fixed the next hotspot or stopped on a stated inclusive-time share. In round 1
+both original-skill runs stopped after their first fix.
 
 ### Caveats
 
-Four tasks with one run per arm cannot establish a difference in either direction, and I make no
-significance claim. Only round 1 produced official scores for both arms, and that round used the
-original skill. Agent runs vary from run to run, and laptop timing is far noisier than the
-benchmark's reference cloud machines. The pilot shows the method works end to end and found a
-concrete flaw in the skill. It can be reproduced or extended with
+Six tasks ran; four produced official scores, two for each skill version, with one or two runs per
+arm. That cannot establish a difference in either direction, and I make no significance claim. The
+spread between two runs of the same arm on one task (1.92 to 6.17 for the skill on sympy-20384) is
+as large as any gap between arms. The skill was revised after seeing round 1, and rounds 2 and 3
+use new tasks to avoid fitting it to the tasks it was revised on. Laptop timing is far noisier
+than the benchmark's reference cloud machines. The pilot shows the method works end to end and
+found a concrete flaw in the original skill. It can be reproduced or extended with
 [`benchmark/run.py`](benchmark/run.py); the method, fairness controls, the host problems, and the
 deviations from the official setup are in [`benchmark/README.md`](benchmark/README.md). Full
 outputs, including every patch, are in [`benchmark/results/`](benchmark/results/).
