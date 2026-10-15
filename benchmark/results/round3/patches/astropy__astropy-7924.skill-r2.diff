@@ -1,0 +1,35 @@
+diff --git a/astropy/coordinates/representation.py b/astropy/coordinates/representation.py
+index 449812a6a..f5b5eb707 100644
+--- a/astropy/coordinates/representation.py
++++ b/astropy/coordinates/representation.py
+@@ -1954,6 +1954,10 @@ class MetaBaseDifferential(InheritDocstrings, abc.ABCMeta):
+                                       .format(component))))
+ 
+ 
++# PERF: L1 - (base unit, differential unit) -> SI derivative-unit key; `Unit.si` runs `compose`, which dominates when recomputed per call
++_DERIV_KEY_CACHE = {}
++
++
+ class BaseDifferential(BaseRepresentationOrDifferential,
+                        metaclass=MetaBaseDifferential):
+     r"""A base class representing differentials of representations.
+@@ -2005,10 +2009,15 @@ class BaseDifferential(BaseRepresentationOrDifferential,
+             comp = getattr(base, name)
+             d_comp = getattr(self, 'd_{0}'.format(name), None)
+             if d_comp is not None:
+-                d_unit = comp.unit / d_comp.unit
+-                # Get the si unit without a scale by going via Quantity;
+-                # `.si` causes the scale to be included in the value.
+-                return str(u.Quantity(1., d_unit).si.unit)
++                unit_pair = (comp.unit, d_comp.unit)
++                key = _DERIV_KEY_CACHE.get(unit_pair)
++                if key is None:
++                    d_unit = comp.unit / d_comp.unit
++                    # Get the si unit without a scale by going via Quantity;
++                    # `.si` causes the scale to be included in the value.
++                    key = str(u.Quantity(1., d_unit).si.unit)
++                    _DERIV_KEY_CACHE[unit_pair] = key
++                return key
+ 
+         else:
+             raise RuntimeError("Invalid representation-differential match! Not "

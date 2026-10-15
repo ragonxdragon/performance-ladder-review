@@ -1,29 +1,29 @@
 metric,baseline,skill,diff_skill_minus_baseline,ci95_low,ci95_high,n,note
-mean_log_speedup_vs_expert,0.004778931206105853,-0.6227541009252974,-0.6275330321314033,,,3,"per-task mean of log SR over runs, then mean over tasks; CI = paired bootstrap over tasks"
-geometric_mean_speedup_vs_expert,1.0047903685099469,0.5364649226232977,0.5339073098589191,,,3,diff column is the skill/baseline ratio
-mean_paired_speedup_difference,1.4270965271666134,1.0547502125912855,-0.3723463145753279,,,3,per-task SR (geometric mean over runs); diff = mean over tasks of skill SR minus baseline SR
-median_speedup_vs_expert,0.9963925488839325,0.9963925488839325,-0.2724813321912929,,,3,diff column is the median of the per-task differences
-harmonic_mean_speedup_vs_expert,0.7092069120250674,0.20007666430058554,-0.5091302477244818,,,3,the official SWE-fficiency aggregate (floor 0.001)
-win_tie_loss,,,0/1/2,,,3,skill vs baseline per task; tie = within 5 percent
-runs,4,4,,,,,agent runs completed
-correct_rate,0.6666666666666666,0.6666666666666666,,,,,"official verdict, per scorable run"
+mean_log_speedup_vs_expert,-0.019829285550833034,-0.25602284576541257,-0.23619356021457955,-0.945533577068591,0.3821437563234695,5,"per-task mean of log SR over runs, then mean over tasks; CI = paired bootstrap over tasks"
+geometric_mean_speedup_vs_expert,0.9803660216673282,0.7741242831284554,0.7896278186099174,0.3884722357152597,1.465422733776096,5,diff column is the skill/baseline ratio
+mean_paired_speedup_difference,1.2910414468957438,1.425235979149035,0.13419453225329125,-0.5119100557155905,1.033837162941533,5,per-task SR (geometric mean over runs); diff = mean over tasks of skill SR minus baseline SR
+median_speedup_vs_expert,0.9963925488839325,0.9963925488839325,-0.025877443973879255,,,5,diff column is the median of the per-task differences
+harmonic_mean_speedup_vs_expert,0.7501603904107049,0.29079017194736784,-0.4593702184633371,-0.649134478331538,0.2620424413295548,5,the official SWE-fficiency aggregate (floor 0.001)
+win_tie_loss,,,1/2/2,,,5,skill vs baseline per task; tie = within 5 percent
+runs,8,8,,,,,agent runs completed
+correct_rate,0.8571428571428571,0.8571428571428571,,,,,"official verdict, per scorable run"
 correct_rate_host_adjusted,1.0,1.0,,,,,ignores tests that also fail for the expert patch on this host
-mean_input_tokens,45.0,39.5,-5.5,,,,per run
-median_input_tokens,25.0,29.0,,,,,per run
-mean_output_tokens,9576.75,14778.75,5202.0,,,,per run
-median_output_tokens,7258.0,11181.5,,,,,per run
-mean_cache_creation_input_tokens,60143.0,75798.75,15655.75,,,,per run
-median_cache_creation_input_tokens,50034.0,74568.0,,,,,per run
-mean_cache_read_input_tokens,1258607.5,1329024.25,70416.75,,,,per run
-median_cache_read_input_tokens,570947.5,760367.5,,,,,per run
-mean_num_turns,23.25,22.75,-0.5,,,,per run
-median_num_turns,13.5,17.0,,,,,per run
-mean_wall_sec,1001.4,1270.85,269.44999999999993,,,,per run
-median_wall_sec,139.3,350.09999999999997,,,,,per run
-mean_tool_calls,22.25,20.75,-1.5,,,,per run
-median_tool_calls,12.5,15.0,,,,,per run
-mean_total_cost_usd_equiv,0.8822265,1.075299525,0.1930730249999999,,,,per run
-median_total_cost_usd_equiv,0.53297025,0.8433277499999999,,,,,per run
+mean_input_tokens,28.25,34.25,6.0,,,,per run
+median_input_tokens,16.0,29.0,,,,,per run
+mean_output_tokens,5781.5,9846.75,4065.25,,,,per run
+median_output_tokens,2450.5,4903.0,,,,,per run
+mean_cache_creation_input_tokens,40282.375,63181.375,22899.0,,,,per run
+median_cache_creation_input_tokens,33454.5,51519.0,,,,,per run
+mean_cache_read_input_tokens,729848.875,1038087.875,308239.0,,,,per run
+median_cache_read_input_tokens,289629.0,760367.5,,,,,per run
+mean_num_turns,14.625,19.625,5.0,,,,per run
+median_num_turns,8.0,17.0,,,,,per run
+mean_wall_sec,554.0875,710.1125,156.02499999999998,,,,per run
+median_wall_sec,111.65,130.8,,,,,per run
+mean_tool_calls,13.625,17.625,4.0,,,,per run
+median_tool_calls,7.0,15.0,,,,,per run
+mean_total_cost_usd_equiv,0.5474561625,0.8383186125,0.29086245,,,,per run
+median_total_cost_usd_equiv,0.3694299,0.6532840499999999,,,,,per run
 rate_skill_fired,0.0,1.0,,,,,per run
 rate_timing_before_first_edit,1.0,1.0,,,,,per run
-rate_profiler_before_first_edit,0.75,1.0,,,,,per run
+rate_profiler_before_first_edit,0.875,1.0,,,,,per run

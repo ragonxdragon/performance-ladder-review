@@ -1,8 +1,6 @@
-# SWE-fficiency A/B: performance-ladder-review (PILOT, study `pilot + pilot2`)
+# SWE-fficiency A/B: performance-ladder-review (study `pilot + pilot2 + round3`)
 
-This view combines 2 studies (pilot, pilot2). They may use different skill versions and different tasks; read the per-study reports first.
-
-**PILOT numbers.** 3 paired task(s). These numbers show the harness works; they are not evidence for or against the skill.
+This view combines 3 studies (pilot, pilot2, round3). They may use different skill versions and different tasks; read the per-study reports first.
 
 ## Per run
 
@@ -16,6 +14,14 @@ This view combines 2 studies (pilot, pilot2). They may use different skill versi
 | pilot2 | numpy__numpy-19608 | skill | 1 | success | 0 | True | 1.583 | 1.004 | 0.996 | 22 | 570 | 567 | 18494 | True | True |
 | pilot2 | pydata__xarray-9808 | baseline | 1 | success | not scorable | not scorable | n/a | n/a | n/a | 57 | 3635 | 3402 | 21143 | False | True |
 | pilot2 | pydata__xarray-9808 | skill | 1 | success | not scorable | not scorable | n/a | n/a | n/a | 46 | 4261 | 1864 | 33038 | True | True |
+| round3 | sympy__sympy-20384 | baseline | 1 | success | 1 | True | 107.265 | 72.685 | 1.476 | 5 | 122 | 121 | 2218 | False | True |
+| round3 | sympy__sympy-20384 | baseline | 2 | success | 1 | True | 129.949 | 72.685 | 1.788 | 5 | 69 | 68 | 1451 | False | True |
+| round3 | sympy__sympy-20384 | skill | 1 | success | 1 | True | 448.510 | 72.685 | 6.171 | 23 | 214 | 213 | 7656 | True | True |
+| round3 | sympy__sympy-20384 | skill | 2 | success | 1 | True | 139.245 | 72.685 | 1.916 | 8 | 128 | 127 | 2497 | True | True |
+| round3 | astropy__astropy-7924 | baseline | 1 | success | 1 | True | 4.613 | 8.822 | 0.523 | 7 | 141 | 138 | 2253 | False | True |
+| round3 | astropy__astropy-7924 | baseline | 2 | success | 1 | True | 5.097 | 8.822 | 0.578 | 7 | 96 | 94 | 2023 | False | True |
+| round3 | astropy__astropy-7924 | skill | 1 | success | 1 | True | 6.008 | 8.822 | 0.681 | 25 | 131 | 129 | 5937 | True | True |
+| round3 | astropy__astropy-7924 | skill | 2 | success | 1 | True | 3.554 | 8.822 | 0.403 | 10 | 124 | 122 | 3569 | True | True |
 
 ## Paired by task
 
@@ -23,41 +29,43 @@ This view combines 2 studies (pilot, pilot2). They may use different skill versi
 | --- | ---: | ---: | ---: | --- |
 | sympy__sympy-12640 | 2.938 | 2.094 | 0.713 | loss |
 | astropy__astropy-6941 | 0.346 | 0.074 | 0.214 | loss |
+| sympy__sympy-20384 | 1.624 | 3.438 | 2.117 | win |
 | numpy__numpy-19608 | 0.996 | 0.996 | 1.000 | tie |
+| astropy__astropy-7924 | 0.550 | 0.524 | 0.953 | tie |
 | pydata__xarray-9808 | n/a | n/a | n/a | not scorable |
 
 ## Aggregates
 
 | Metric | Baseline | Skill | Skill minus baseline | 95% CI | n |
 | --- | ---: | ---: | ---: | --- | ---: |
-| mean_log_speedup_vs_expert | 0.005 | -0.623 | -0.628 | n/a | 3 |
-| geometric_mean_speedup_vs_expert | 1.005 | 0.536 | 0.534 | n/a | 3 |
-| mean_paired_speedup_difference | 1.427 | 1.055 | -0.372 | n/a | 3 |
-| median_speedup_vs_expert | 0.996 | 0.996 | -0.272 | n/a | 3 |
-| harmonic_mean_speedup_vs_expert | 0.709 | 0.200 | -0.509 | n/a | 3 |
-| win_tie_loss | n/a | n/a | 0/1/2 | n/a | 3 |
-| runs | 4 | 4 | n/a | n/a | n/a |
-| correct_rate | 0.667 | 0.667 | n/a | n/a | n/a |
+| mean_log_speedup_vs_expert | -0.020 | -0.256 | -0.236 | -0.946 to 0.382 | 5 |
+| geometric_mean_speedup_vs_expert | 0.980 | 0.774 | 0.790 | 0.388 to 1.465 | 5 |
+| mean_paired_speedup_difference | 1.291 | 1.425 | 0.134 | -0.512 to 1.034 | 5 |
+| median_speedup_vs_expert | 0.996 | 0.996 | -0.026 | n/a | 5 |
+| harmonic_mean_speedup_vs_expert | 0.750 | 0.291 | -0.459 | -0.649 to 0.262 | 5 |
+| win_tie_loss | n/a | n/a | 1/2/2 | n/a | 5 |
+| runs | 8 | 8 | n/a | n/a | n/a |
+| correct_rate | 0.857 | 0.857 | n/a | n/a | n/a |
 | correct_rate_host_adjusted | 1.000 | 1.000 | n/a | n/a | n/a |
-| mean_input_tokens | 45.000 | 39.500 | -5.500 | n/a | n/a |
-| median_input_tokens | 25.000 | 29.000 | n/a | n/a | n/a |
-| mean_output_tokens | 9576.750 | 14778.750 | 5202.000 | n/a | n/a |
-| median_output_tokens | 7258.000 | 11181.500 | n/a | n/a | n/a |
-| mean_cache_creation_input_tokens | 60143.000 | 75798.750 | 15655.750 | n/a | n/a |
-| median_cache_creation_input_tokens | 50034.000 | 74568.000 | n/a | n/a | n/a |
-| mean_cache_read_input_tokens | 1258607.500 | 1329024.250 | 70416.750 | n/a | n/a |
-| median_cache_read_input_tokens | 570947.500 | 760367.500 | n/a | n/a | n/a |
-| mean_num_turns | 23.250 | 22.750 | -0.500 | n/a | n/a |
-| median_num_turns | 13.500 | 17.000 | n/a | n/a | n/a |
-| mean_wall_sec | 1001.400 | 1270.850 | 269.450 | n/a | n/a |
-| median_wall_sec | 139.300 | 350.100 | n/a | n/a | n/a |
-| mean_tool_calls | 22.250 | 20.750 | -1.500 | n/a | n/a |
-| median_tool_calls | 12.500 | 15.000 | n/a | n/a | n/a |
-| mean_total_cost_usd_equiv | 0.882 | 1.075 | 0.193 | n/a | n/a |
-| median_total_cost_usd_equiv | 0.533 | 0.843 | n/a | n/a | n/a |
+| mean_input_tokens | 28.250 | 34.250 | 6.000 | n/a | n/a |
+| median_input_tokens | 16.000 | 29.000 | n/a | n/a | n/a |
+| mean_output_tokens | 5781.500 | 9846.750 | 4065.250 | n/a | n/a |
+| median_output_tokens | 2450.500 | 4903.000 | n/a | n/a | n/a |
+| mean_cache_creation_input_tokens | 40282.375 | 63181.375 | 22899.000 | n/a | n/a |
+| median_cache_creation_input_tokens | 33454.500 | 51519.000 | n/a | n/a | n/a |
+| mean_cache_read_input_tokens | 729848.875 | 1038087.875 | 308239.000 | n/a | n/a |
+| median_cache_read_input_tokens | 289629.000 | 760367.500 | n/a | n/a | n/a |
+| mean_num_turns | 14.625 | 19.625 | 5.000 | n/a | n/a |
+| median_num_turns | 8.000 | 17.000 | n/a | n/a | n/a |
+| mean_wall_sec | 554.087 | 710.112 | 156.025 | n/a | n/a |
+| median_wall_sec | 111.650 | 130.800 | n/a | n/a | n/a |
+| mean_tool_calls | 13.625 | 17.625 | 4.000 | n/a | n/a |
+| median_tool_calls | 7.000 | 15.000 | n/a | n/a | n/a |
+| mean_total_cost_usd_equiv | 0.547 | 0.838 | 0.291 | n/a | n/a |
+| median_total_cost_usd_equiv | 0.369 | 0.653 | n/a | n/a | n/a |
 | rate_skill_fired | 0.000 | 1.000 | n/a | n/a | n/a |
 | rate_timing_before_first_edit | 1.000 | 1.000 | n/a | n/a | n/a |
-| rate_profiler_before_first_edit | 0.750 | 1.000 | n/a | n/a | n/a |
+| rate_profiler_before_first_edit | 0.875 | 1.000 | n/a | n/a | n/a |
 
 ## Notes
 

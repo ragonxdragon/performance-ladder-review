@@ -1,0 +1,29 @@
+metric,baseline,skill,diff_skill_minus_baseline,ci95_low,ci95_high,n,note
+mean_log_speedup_vs_expert,-0.05674161068624137,0.29407403697441464,0.35081564766065604,,,2,"per-task mean of log SR over runs, then mean over tasks; CI = paired bootstrap over tasks"
+geometric_mean_speedup_vs_expert,0.9448381739155327,1.3418832489650845,1.4202254798873601,,,2,diff column is the skill/baseline ratio
+mean_paired_speedup_difference,1.0869588264894392,1.9809646289856593,0.8940058024962201,,,2,per-task SR (geometric mean over runs); diff = mean over tasks of skill SR minus baseline SR
+median_speedup_vs_expert,1.0869588264894392,1.9809646289856593,0.8940058024962201,,,2,diff column is the median of the per-task differences
+harmonic_mean_speedup_vs_expert,0.8212998994370944,0.9089766811107087,0.08767678167361437,,,2,the official SWE-fficiency aggregate (floor 0.001)
+win_tie_loss,,,1/1/0,,,2,skill vs baseline per task; tie = within 5 percent
+runs,4,4,,,,,agent runs completed
+correct_rate,1.0,1.0,,,,,"official verdict, per scorable run"
+correct_rate_host_adjusted,1.0,1.0,,,,,ignores tests that also fail for the expert patch on this host
+mean_input_tokens,11.5,29.0,17.5,,,,per run
+median_input_tokens,12.0,29.0,,,,,per run
+mean_output_tokens,1986.25,4914.75,2928.5,,,,per run
+median_output_tokens,2120.5,4753.0,,,,,per run
+mean_cache_creation_input_tokens,20421.75,50564.0,30142.25,,,,per run
+median_cache_creation_input_tokens,20628.0,44396.5,,,,,per run
+mean_cache_read_input_tokens,201090.25,747151.5,546061.25,,,,per run
+median_cache_read_input_tokens,211129.5,738411.5,,,,,per run
+mean_num_turns,6.0,16.5,10.5,,,,per run
+median_num_turns,6.0,16.5,,,,,per run
+mean_wall_sec,106.775,149.375,42.599999999999994,,,,per run
+median_wall_sec,108.8,129.6,,,,,per run
+mean_tool_calls,5.0,14.5,9.5,,,,per run
+median_tool_calls,5.0,14.5,,,,,per run
+mean_total_cost_usd_equiv,0.212685825,0.6013377,0.388651875,,,,per run
+median_total_cost_usd_equiv,0.2135268,0.59236605,,,,,per run
+rate_skill_fired,0.0,1.0,,,,,per run
+rate_timing_before_first_edit,1.0,1.0,,,,,per run
+rate_profiler_before_first_edit,1.0,1.0,,,,,per run

@@ -1,0 +1,33 @@
+diff --git a/astropy/coordinates/representation.py b/astropy/coordinates/representation.py
+index 449812a6a..fab3d5b63 100644
+--- a/astropy/coordinates/representation.py
++++ b/astropy/coordinates/representation.py
+@@ -42,6 +42,9 @@ __all__ = ["BaseRepresentationOrDifferential", "BaseRepresentation",
+ REPRESENTATION_CLASSES = {}
+ DIFFERENTIAL_CLASSES = {}
+ 
++# PERF: L1 - (base unit, differential unit) -> SI derivative key; units are immutable.
++_DERIV_KEY_CACHE = {}
++
+ 
+ # recommended_units deprecation message; if the attribute is removed later,
+ # also remove its use in BaseFrame._get_representation_info.
+@@ -2005,10 +2008,17 @@ class BaseDifferential(BaseRepresentationOrDifferential,
+             comp = getattr(base, name)
+             d_comp = getattr(self, 'd_{0}'.format(name), None)
+             if d_comp is not None:
++                cache_key = (comp.unit, d_comp.unit)
++                try:
++                    return _DERIV_KEY_CACHE[cache_key]
++                except KeyError:
++                    pass
+                 d_unit = comp.unit / d_comp.unit
+                 # Get the si unit without a scale by going via Quantity;
+                 # `.si` causes the scale to be included in the value.
+-                return str(u.Quantity(1., d_unit).si.unit)
++                key = str(u.Quantity(1., d_unit).si.unit)
++                _DERIV_KEY_CACHE[cache_key] = key
++                return key
+ 
+         else:
+             raise RuntimeError("Invalid representation-differential match! Not "
